@@ -1,17 +1,17 @@
 export const site = {
   name: "Sahil Kashyap",
   role: "Researcher",
-  location: "",
+  location: "Delhi, India",
   tagline:
     "Working on model-form errors, latent forces, and learning from data the parts of physics our equations leave out.",
   about: [
     "I'm a researcher exploring the boundary between data-driven and physics-based modeling. My work focuses on identifying and correcting the structural gaps that classical models carry — the assumptions baked in long before the data arrives.",
     "Recent work treats model-form error as a latent force: something inferable, separable, and useful, rather than noise to be smoothed over.",
   ],
-  email: "smicrlab@gmail.com",
+  email: "sahilkashyap.nr@gmail.com",
   avatar: "/sahil.jpg",
   links: [
-    { label: "Email", href: "mailto:smicrlab@gmail.com" },
+    { label: "Email", href: "mailto:sahilkashyap.nr@gmail.com" },
     {
       label: "Google Scholar",
       href: "https://scholar.google.com/citations?hl=en&user=0MO0ArAAAAAJ",

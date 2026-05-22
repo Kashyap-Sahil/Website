@@ -4,14 +4,14 @@ import { site } from "@/content/site";
 export function Hero() {
   return (
     <section className="mx-auto max-w-5xl px-6 pt-20 pb-28 sm:px-10 sm:pt-28 sm:pb-36">
-      <div className="flex items-center gap-5 mb-10">
+      <div className="flex items-center gap-6 mb-10">
         <Image
           src={site.avatar}
           alt={site.name}
-          width={72}
-          height={72}
+          width={160}
+          height={160}
           priority
-          className="h-16 w-16 rounded-full object-cover sm:h-[72px] sm:w-[72px]"
+          className="h-28 w-28 rounded-full object-cover sm:h-36 sm:w-36 md:h-40 md:w-40"
         />
         <p className="text-sm uppercase tracking-[0.18em] text-muted">
           {site.role}
