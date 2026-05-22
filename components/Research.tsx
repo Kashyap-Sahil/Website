@@ -21,7 +21,7 @@ export function Research() {
               <p className="mt-2 text-sm text-muted">
                 {[paper.venue, paper.year].filter(Boolean).join(", ")}
               </p>
-              <p className="mt-4 max-w-prose text-base leading-relaxed text-ink/80">
+              <p className="mt-4 text-base leading-relaxed text-ink/80 text-justify hyphens-auto">
                 {paper.summary}
               </p>
               {paper.href ? (
