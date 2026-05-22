@@ -26,7 +26,6 @@ export const site = {
       summary:
         "In practice, the true equation of motion is often unknown, and the assumed model contains discrepancies due to unmodelled physics. Here, the true system has a localised nonlinearity under ground-motion excitation, whose location and nature are unknown to the modeller. We use a Gaussian-Process Latent Force Model (GP-LFM) to identify the missing physics through GP-modelled latent forces.",
       embed: "/animation-model-form-errors.html",
-      cropBottom: 80,
       href: "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=0MO0ArAAAAAJ&citation_for_view=0MO0ArAAAAAJ:u5HHmVD_uO8C",
     },
     {
