@@ -1,0 +1,1455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Physics-as-measurement — explainer</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; background: #F5F1E8; }
+  body { font-family: Inter, system-ui, sans-serif; color: #14110D; }
+  *, *::before, *::after { box-sizing: border-box; }
+  text { dominant-baseline: alphabetic; }
+  svg text { font-feature-settings: "kern" 1, "liga" 1, "calt" 1; }
+  button:focus-visible { outline: 2px solid #2C7A7B; outline-offset: 2px; }
+  .katex { color: inherit; line-height: 1; }
+  .katex-html { white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" crossorigin="anonymous"></script>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     animations.jsx — Stage / Timeline / Sprite / easing helpers
+     ════════════════════════════════════════════════════════════════════ -->
+<script type="text/babel" data-presets="react">
+const Easing = {
+  linear: (t) => t,
+  easeInQuad:    (t) => t * t,
+  easeOutQuad:   (t) => t * (2 - t),
+  easeInOutQuad: (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
+  easeInCubic:    (t) => t * t * t,
+  easeOutCubic:   (t) => (--t) * t * t + 1,
+  easeInOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1),
+  easeInQuart:    (t) => t * t * t * t,
+  easeOutQuart:   (t) => 1 - (--t) * t * t * t,
+  easeInOutQuart: (t) => (t < 0.5 ? 8 * t * t * t * t : 1 - 8 * (--t) * t * t * t),
+  easeInExpo:  (t) => (t === 0 ? 0 : Math.pow(2, 10 * (t - 1))),
+  easeOutExpo: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
+  easeInOutExpo: (t) => {
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    if (t < 0.5) return 0.5 * Math.pow(2, 20 * t - 10);
+    return 1 - 0.5 * Math.pow(2, -20 * t + 10);
+  },
+  easeInSine:    (t) => 1 - Math.cos((t * Math.PI) / 2),
+  easeOutSine:   (t) => Math.sin((t * Math.PI) / 2),
+  easeInOutSine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
+  easeOutBack: (t) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); },
+  easeInBack:  (t) => { const c1 = 1.70158, c3 = c1 + 1; return c3 * t * t * t - c1 * t * t; },
+  easeInOutBack: (t) => {
+    const c1 = 1.70158, c2 = c1 * 1.525;
+    return t < 0.5
+      ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+      : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
+  },
+  easeOutElastic: (t) => {
+    const c4 = (2 * Math.PI) / 3;
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+  },
+};
+
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+function interpolate(input, output, ease = Easing.linear) {
+  return (t) => {
+    if (t <= input[0]) return output[0];
+    if (t >= input[input.length - 1]) return output[output.length - 1];
+    for (let i = 0; i < input.length - 1; i++) {
+      if (t >= input[i] && t <= input[i + 1]) {
+        const span = input[i + 1] - input[i];
+        const local = span === 0 ? 0 : (t - input[i]) / span;
+        const easeFn = Array.isArray(ease) ? (ease[i] || Easing.linear) : ease;
+        const eased = easeFn(local);
+        return output[i] + (output[i + 1] - output[i]) * eased;
+      }
+    }
+    return output[output.length - 1];
+  };
+}
+
+function animate({ from = 0, to = 1, start = 0, end = 1, ease = Easing.easeInOutCubic }) {
+  return (t) => {
+    if (t <= start) return from;
+    if (t >= end) return to;
+    const local = (t - start) / (end - start);
+    return from + (to - from) * ease(local);
+  };
+}
+
+const TimelineContext = React.createContext({ time: 0, duration: 10, playing: false });
+const useTime = () => React.useContext(TimelineContext).time;
+const useTimeline = () => React.useContext(TimelineContext);
+
+const SpriteContext = React.createContext({ localTime: 0, progress: 0, duration: 0 });
+const useSprite = () => React.useContext(SpriteContext);
+
+function Sprite({ start = 0, end = Infinity, children, keepMounted = false }) {
+  const { time } = useTimeline();
+  const visible = time >= start && time <= end;
+  if (!visible && !keepMounted) return null;
+  const duration = end - start;
+  const localTime = Math.max(0, time - start);
+  const progress = duration > 0 && isFinite(duration) ? clamp(localTime / duration, 0, 1) : 0;
+  const value = { localTime, progress, duration, visible };
+  return (
+    <SpriteContext.Provider value={value}>
+      {typeof children === 'function' ? children(value) : children}
+    </SpriteContext.Provider>
+  );
+}
+
+function Stage({
+  width = 1280, height = 720, duration = 10,
+  background = '#f6f4ef', shellBackground = '#0a0a0a',
+  barTheme = 'dark', fps = 60, loop = true, autoplay = true,
+  persistKey = 'animstage', belowCanvas = null, children,
+}) {
+  const [time, setTime] = React.useState(() => {
+    try {
+      const v = parseFloat(localStorage.getItem(persistKey + ':t') || '0');
+      return isFinite(v) ? clamp(v, 0, duration) : 0;
+    } catch { return 0; }
+  });
+  const [playing, setPlaying] = React.useState(autoplay);
+  const [hoverTime, setHoverTime] = React.useState(null);
+  const [scale, setScale] = React.useState(1);
+
+  const stageRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+  const rafRef = React.useRef(null);
+  const lastTsRef = React.useRef(null);
+
+  React.useEffect(() => {
+    try { localStorage.setItem(persistKey + ':t', String(time)); } catch {}
+  }, [time, persistKey]);
+
+  React.useEffect(() => {
+    if (!stageRef.current) return;
+    const el = stageRef.current;
+    const measure = () => {
+      const barH = 44;
+      const s = Math.min(el.clientWidth / width, (el.clientHeight - barH) / height);
+      setScale(Math.max(0.05, s));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, [width, height]);
+
+  React.useEffect(() => {
+    if (!playing) { lastTsRef.current = null; return; }
+    const step = (ts) => {
+      if (lastTsRef.current == null) lastTsRef.current = ts;
+      const dt = (ts - lastTsRef.current) / 1000;
+      lastTsRef.current = ts;
+      setTime((t) => {
+        let next = t + dt;
+        if (next >= duration) {
+          if (loop) next = next % duration;
+          else { next = duration; setPlaying(false); }
+        }
+        return next;
+      });
+      rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); lastTsRef.current = null; };
+  }, [playing, duration, loop]);
+
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.code === 'Space') { e.preventDefault(); setPlaying(p => !p); }
+      else if (e.code === 'ArrowLeft')  setTime(t => clamp(t - (e.shiftKey ? 1 : 0.1), 0, duration));
+      else if (e.code === 'ArrowRight') setTime(t => clamp(t + (e.shiftKey ? 1 : 0.1), 0, duration));
+      else if (e.key === '0' || e.code === 'Home') setTime(0);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [duration]);
+
+  const displayTime = hoverTime != null ? hoverTime : time;
+  const ctxValue = React.useMemo(
+    () => ({ time: displayTime, duration, playing, setTime, setPlaying }),
+    [displayTime, duration, playing]
+  );
+
+  return (
+    <div ref={stageRef} style={{
+      position: 'absolute', inset: 0,
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      background: shellBackground, fontFamily: 'Inter, system-ui, sans-serif',
+    }}>
+      <div style={{
+        flex: 1, width: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden', minHeight: 0,
+      }}>
+        <div ref={canvasRef} style={{
+          width, height, background, position: 'relative',
+          transform: `scale(${scale})`, transformOrigin: 'center',
+          flexShrink: 0,
+          boxShadow: shellBackground === '#0a0a0a' ? '0 20px 60px rgba(0,0,0,0.4)' : 'none',
+          overflow: 'hidden',
+        }}>
+          <TimelineContext.Provider value={ctxValue}>
+            {children}
+          </TimelineContext.Provider>
+        </div>
+      </div>
+
+      <TimelineContext.Provider value={ctxValue}>
+        {belowCanvas}
+      </TimelineContext.Provider>
+
+      <PlaybackBar
+        time={displayTime} actualTime={time} duration={duration}
+        playing={playing} theme={barTheme}
+        onPlayPause={() => setPlaying(p => !p)}
+        onReset={() => { setTime(0); }}
+        onSeek={(t) => setTime(t)}
+        onHover={(t) => setHoverTime(t)}
+      />
+    </div>
+  );
+}
+
+function PlaybackBar({ time, duration, playing, onPlayPause, onReset, onSeek, onHover, theme = 'dark' }) {
+  const light = theme === 'light';
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+
+  const timeFromEvent = React.useCallback((e) => {
+    const rect = trackRef.current.getBoundingClientRect();
+    const x = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    return x * duration;
+  }, [duration]);
+
+  const onTrackMove = (e) => {
+    if (!trackRef.current) return;
+    const t = timeFromEvent(e);
+    if (dragging) onSeek(t); else onHover(t);
+  };
+  const onTrackLeave = () => { if (!dragging) onHover(null); };
+  const onTrackDown = (e) => { setDragging(true); const t = timeFromEvent(e); onSeek(t); onHover(null); };
+
+  React.useEffect(() => {
+    if (!dragging) return;
+    const onUp = () => setDragging(false);
+    const onMove = (e) => { if (!trackRef.current) return; const t = timeFromEvent(e); onSeek(t); };
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('mousemove', onMove);
+    return () => { window.removeEventListener('mouseup', onUp); window.removeEventListener('mousemove', onMove); };
+  }, [dragging, timeFromEvent, onSeek]);
+
+  const pct = duration > 0 ? (time / duration) * 100 : 0;
+  const fmt = (t) => {
+    const total = Math.max(0, t);
+    const m = Math.floor(total / 60);
+    const s = Math.floor(total % 60);
+    const cs = Math.floor((total * 100) % 100);
+    return `${String(m).padStart(1, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+  };
+  const mono = 'JetBrains Mono, ui-monospace, SFMono-Regular, monospace';
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '8px 16px',
+      background: light ? 'rgba(255,255,255,0.65)' : 'rgba(20,20,20,0.92)',
+      border: light ? '1px solid rgba(20,17,13,0.10)' : '1px solid rgba(255,255,255,0.08)',
+      width: '100%', maxWidth: 680, alignSelf: 'center', marginBottom: 12,
+      borderRadius: 8,
+      color: light ? '#14110D' : '#f6f4ef',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      userSelect: 'none', flexShrink: 0,
+    }}>
+      <IconButton onClick={onReset} title="Restart (0)" light={light}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M3 2v10M12 2L5 7l7 5V2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
+        </svg>
+      </IconButton>
+      <IconButton onClick={onPlayPause} title="Play/pause (space)" light={light}>
+        {playing ? (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="3" y="2" width="3" height="10" fill="currentColor"/>
+            <rect x="8" y="2" width="3" height="10" fill="currentColor"/>
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3 2l9 5-9 5V2z" fill="currentColor"/>
+          </svg>
+        )}
+      </IconButton>
+
+      <div style={{
+        fontFamily: mono, fontSize: 12, fontVariantNumeric: 'tabular-nums',
+        width: 64, textAlign: 'right', color: light ? '#14110D' : '#f6f4ef',
+      }}>{fmt(time)}</div>
+
+      <div ref={trackRef}
+        onMouseMove={onTrackMove} onMouseLeave={onTrackLeave} onMouseDown={onTrackDown}
+        style={{ flex: 1, height: 22, position: 'relative', cursor: 'pointer',
+                 display: 'flex', alignItems: 'center' }}>
+        <div style={{ position: 'absolute', left: 0, right: 0, height: 4,
+          background: light ? 'rgba(20,17,13,0.12)' : 'rgba(255,255,255,0.12)', borderRadius: 2 }}/>
+        <div style={{ position: 'absolute', left: 0, width: `${pct}%`, height: 4,
+          background: light ? '#2C7A7B' : 'oklch(72% 0.12 250)', borderRadius: 2 }}/>
+        <div style={{ position: 'absolute', left: `${pct}%`, top: '50%',
+          width: 12, height: 12, marginLeft: -6, marginTop: -6,
+          background: light ? '#14110D' : '#fff', borderRadius: 6,
+          boxShadow: light ? '0 1px 2px rgba(0,0,0,0.15)' : '0 2px 4px rgba(0,0,0,0.4)' }}/>
+      </div>
+
+      <div style={{
+        fontFamily: mono, fontSize: 12, fontVariantNumeric: 'tabular-nums',
+        width: 64, textAlign: 'left',
+        color: light ? 'rgba(20,17,13,0.55)' : 'rgba(246,244,239,0.55)',
+      }}>{fmt(duration)}</div>
+    </div>
+  );
+}
+
+function IconButton({ children, onClick, title, light = false }) {
+  const [hover, setHover] = React.useState(false);
+  return (
+    <button onClick={onClick} title={title}
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{
+        width: 28, height: 28,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: light
+          ? (hover ? 'rgba(20,17,13,0.08)' : 'rgba(20,17,13,0.02)')
+          : (hover ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'),
+        border: light ? '1px solid rgba(20,17,13,0.10)' : '1px solid rgba(255,255,255,0.1)',
+        borderRadius: 6, color: light ? '#14110D' : '#f6f4ef',
+        cursor: 'pointer', padding: 0, transition: 'background 120ms',
+      }}>
+      {children}
+    </button>
+  );
+}
+
+Object.assign(window, {
+  Easing, interpolate, animate, clamp,
+  TimelineContext, useTime, useTimeline,
+  Sprite, SpriteContext, useSprite,
+  Stage, PlaybackBar,
+});
+</script>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     scenes.jsx — Physics-as-measurement explainer scenes & app
+     ════════════════════════════════════════════════════════════════════ -->
+<script type="text/babel" data-presets="react">
+const PAPER_BG  = '#F5F1E8';
+const INK       = '#14110D';
+const INK2      = '#2A2620';
+const INK_DIM   = 'rgba(20,17,13,0.55)';
+const INK_FAINT = 'rgba(20,17,13,0.35)';
+const RULE      = 'rgba(20,17,13,0.22)';
+const RULE_SOFT = 'rgba(20,17,13,0.10)';
+const TEAL      = '#2C7A7B';
+const TEAL_SOFT = 'rgba(44,122,123,0.16)';
+const TEAL_MED  = 'rgba(44,122,123,0.30)';
+const RED       = '#A23A2E';
+const RED_SOFT  = 'rgba(162,58,46,0.18)';
+
+const SERIF = "'EB Garamond','Source Serif Pro','Iowan Old Style',Georgia,serif";
+const SANS  = "Inter,system-ui,'Helvetica Neue',Arial,sans-serif";
+const MONO  = "'JetBrains Mono',ui-monospace,SFMono-Regular,monospace";
+
+const CW = 960, CH = 540;
+
+const T = {
+  S1: [0.0,  8.0],
+  S2: [8.0,  18.0],
+  S3: [18.0, 32.0],
+  S4: [32.0, 42.0],
+};
+const TOTAL = 42.0;
+
+const CAPTIONS = [
+  { t: 0.0,  text: "Two noisy channels: a measured force, a measured response." },
+  { t: 8.0,  text: "Standard GPLFM integrates the ODE forward; input noise contaminates the inferred discrepancy." },
+  { t: 18.0, text: "Instead, treat the governing equation as a measurement constraint." },
+  { t: 22.0, text: "Matérn-GP priors on state and on model-form error; both have linear SDE forms." },
+  { t: 32.0, text: "One Kalman and RTS pass.  O(N).  No integration, no drift." },
+];
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const smoothstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+function noiseAt(t, seed = 1) {
+  return 0.42 * Math.sin(t * 11.7 + seed * 1.31)
+       + 0.30 * Math.sin(t * 23.3 + seed * 2.91)
+       + 0.28 * Math.sin(t * 41.7 + seed * 4.07);
+}
+
+const u_signal  = (t) => 0.85 * Math.sin(2 * Math.PI * 0.45 * t) + 0.20 * Math.sin(2 * Math.PI * 1.30 * t + 1.1);
+const q_signal  = (t) => 0.75 * Math.sin(2 * Math.PI * 0.45 * t - 0.6) + 0.18 * Math.sin(2 * Math.PI * 1.30 * t + 0.4);
+const eta_true  = (t) => 0.45 * Math.sin(2 * Math.PI * 0.27 * t + 0.8) + 0.18 * Math.sin(2 * Math.PI * 0.62 * t - 0.3);
+const eta_drift = (t, contam) => eta_true(t) + contam * (0.55 * noiseAt(t, 3.1) + 0.32 * Math.sin(0.18 * t + 1.4) * Math.tanh(Math.max(0, t) / 6));
+
+function tracePath(xL, xR, yC, h, tA, tB, fn, samples = 90) {
+  let d = '';
+  for (let i = 0; i < samples; i++) {
+    const u = i / (samples - 1);
+    const tt = tA + (tB - tA) * u;
+    const x = xL + u * (xR - xL);
+    const y = yC - fn(tt) * (h * 0.5);
+    d += (i === 0 ? 'M' : 'L') + x.toFixed(2) + ' ' + y.toFixed(2) + ' ';
+  }
+  return d;
+}
+
+const noisy = (signalFn, noiseSeed, noiseAmp) => (t) => signalFn(t) + noiseAmp * noiseAt(t, noiseSeed);
+
+function Tex({ tex, x = 0, y = 0, anchor = 'start', verticalAlign = 'middle',
+               display = false, color = INK, fontSize = 14, opacity = 1 }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (ref.current && window.katex) {
+      try {
+        window.katex.render(tex, ref.current, {
+          throwOnError: false, displayMode: display, output: 'html',
+          trust: true, strict: false,
+        });
+      } catch (e) {}
+    }
+  }, [tex, display]);
+
+  const W = 400;
+  const H = Math.max(28, fontSize * 1.8);
+  const justify = anchor === 'middle' ? 'center' : anchor === 'end' ? 'flex-end' : 'flex-start';
+  const align   = verticalAlign === 'middle' ? 'center' : verticalAlign === 'bottom' ? 'flex-end' : 'flex-start';
+  const fx = anchor === 'middle' ? x - W / 2 : anchor === 'end' ? x - W : x;
+  const fy = verticalAlign === 'middle' ? y - H / 2 : verticalAlign === 'bottom' ? y - H : y;
+
+  return (
+    <foreignObject x={fx} y={fy} width={W} height={H} style={{ overflow: 'visible', opacity }}>
+      <div xmlns="http://www.w3.org/1999/xhtml" style={{
+        width: '100%', height: '100%',
+        display: 'flex', alignItems: align, justifyContent: justify,
+        color, fontSize, lineHeight: 1, fontFamily: SERIF,
+      }}>
+        <span ref={ref} />
+      </div>
+    </foreignObject>
+  );
+}
+
+function M({ children, x = 0, y = 0, size = 16, color = INK, anchor = 'start', italic = true, style }) {
+  return (
+    <text x={x} y={y} fill={color}
+      fontFamily={SERIF} fontSize={size} fontStyle={italic ? 'italic' : 'normal'}
+      textAnchor={anchor} style={{ ...style }}>{children}</text>
+  );
+}
+
+function S({ text, x = 0, y = 0, size = 11, color = INK_DIM, anchor = 'start', weight = 500, tracking = '0.04em', noUpper = false }) {
+  return (
+    <text x={x} y={y} fill={color}
+      fontFamily={SANS} fontSize={size} fontWeight={weight}
+      letterSpacing={tracking} textAnchor={anchor}
+      style={noUpper ? null : { textTransform: 'uppercase' }}>{text}</text>
+  );
+}
+
+function NodeBox({ x, y, w, h, label, sub, fill = 'transparent', stroke = INK, strokeWidth = 1.25, dashed = false, children }) {
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {label && (
+        <text x={w / 2} y={-9} fill={INK_DIM}
+          fontFamily={SANS} fontSize={9.5} fontWeight={500} letterSpacing="0.10em"
+          textAnchor="middle" style={{ textTransform: 'uppercase' }}>{label}</text>
+      )}
+      <rect x={0} y={0} width={w} height={h} rx={3} ry={3}
+        fill={fill} stroke={stroke} strokeWidth={strokeWidth}
+        strokeDasharray={dashed ? '4 3' : 'none'} />
+      {sub && <text x={w / 2} y={h + 14} fill={INK_DIM} fontFamily={SANS} fontSize={10} textAnchor="middle">{sub}</text>}
+      {children}
+    </g>
+  );
+}
+
+function Arrow({ x1, y1, x2, y2, color = INK, width = 1.25, dashed = false, head = true, opacity = 1, headSize = 6 }) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const px = -uy, py = ux;
+  const hx = x2 - ux * headSize, hy = y2 - uy * headSize;
+  return (
+    <g opacity={opacity}>
+      <line x1={x1} y1={y1} x2={head ? hx : x2} y2={head ? hy : y2}
+        stroke={color} strokeWidth={width}
+        strokeDasharray={dashed ? '4 3' : 'none'}
+        strokeLinecap="round" />
+      {head && (
+        <polygon points={`${x2},${y2} ${hx + px * headSize * 0.45},${hy + py * headSize * 0.45} ${hx - px * headSize * 0.45},${hy - py * headSize * 0.45}`} fill={color} />
+      )}
+    </g>
+  );
+}
+
+function TraceCard({ x, y, w, h, time, signalFn, noiseAmp, noiseSeed, label, mathLabel, window = 4.2, showSignal = true, showNoise = true, clipId }) {
+  const tB = time, tA = time - window;
+  const cy = h / 2;
+  const dSig = tracePath(0, w, cy, h * 0.85, tA, tB, signalFn);
+  const dNoisy = tracePath(0, w, cy, h * 0.85, tA, tB, noisy(signalFn, noiseSeed, noiseAmp));
+  const realClipId = clipId || `tc-${x}-${y}-${w}-${h}`;
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <defs>
+        <clipPath id={realClipId}>
+          <rect x={0} y={0} width={w} height={h} />
+        </clipPath>
+      </defs>
+      {label && (
+        <text x={w / 2} y={-8} fill={INK_DIM}
+          fontFamily={SANS} fontSize={9.5} fontWeight={500} letterSpacing="0.10em"
+          textAnchor="middle" style={{ textTransform: 'uppercase' }}>{label}</text>
+      )}
+      <rect x={0} y={0} width={w} height={h} fill="rgba(255,255,255,0.45)" stroke={RULE} strokeWidth={1} />
+      <line x1={0} y1={cy} x2={w} y2={cy} stroke={RULE_SOFT} strokeWidth={1} strokeDasharray="2 3" />
+      <g clipPath={`url(#${realClipId})`}>
+        {showNoise && <path d={dNoisy} fill="none" stroke={RED} strokeWidth={1} opacity={0.85} />}
+        {showSignal && <path d={dSig} fill="none" stroke={INK} strokeWidth={1.4} />}
+      </g>
+      {mathLabel && (
+        <foreignObject x={w - 92} y={-22} width={92} height={20} style={{ overflow: 'visible' }}>
+          <div xmlns="http://www.w3.org/1999/xhtml" style={{
+            width: '100%', height: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+            color: INK, fontSize: 13, fontFamily: SERIF,
+          }}>
+            <TexInline tex={mathLabel} />
+          </div>
+        </foreignObject>
+      )}
+    </g>
+  );
+}
+
+function TexInline({ tex, display = false }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (ref.current && window.katex) {
+      try {
+        window.katex.render(tex, ref.current, {
+          throwOnError: false, displayMode: display, output: 'html',
+          trust: true, strict: false,
+        });
+      } catch (e) {}
+    }
+  }, [tex, display]);
+  return <span ref={ref} />;
+}
+
+function Scene1() {
+  const time = useTime();
+  const { localTime, progress } = useSprite();
+
+  const intro = smoothstep(0.0, 1.0, localTime);
+  const swayAmp = 14 * intro;
+  const q = swayAmp * Math.sin(2 * Math.PI * 0.45 * time);
+
+  const showSensor1 = localTime > 1.4;
+  const showSensor2 = localTime > 2.6;
+  const showTraces1 = localTime > 1.9;
+  const showTraces2 = localTime > 3.1;
+  const showStateLabel = localTime > 4.2;
+
+  const baseY = 380;
+  const colW = 6;
+  const beamW = 160;
+  const colH = 180;
+  const cxFrame = 175;
+
+  const beamMidX = cxFrame + q * 0.8;
+  const beamY = baseY - colH;
+
+  return (
+    <g>
+      <S x={48} y={56} size={10} color={INK_DIM} tracking="0.16em" text="01 · System & sensors" />
+      <line x1={48} y1={66} x2={120} y2={66} stroke={INK} strokeWidth={1} opacity={Math.min(1, intro)} />
+
+      <g opacity={intro}>
+        <line x1={cxFrame - 120} y1={baseY} x2={cxFrame + 120} y2={baseY} stroke={INK} strokeWidth={1.25} />
+        {Array.from({ length: 13 }).map((_, i) => {
+          const gx = cxFrame - 110 + i * 18;
+          return <line key={i} x1={gx} y1={baseY} x2={gx - 8} y2={baseY + 10} stroke={INK} strokeWidth={1} />;
+        })}
+      </g>
+
+      <g opacity={intro}>
+        <line x1={cxFrame - 60} y1={baseY} x2={cxFrame - 60 + q * 0.8} y2={beamY} stroke={INK} strokeWidth={1.7} />
+        <line x1={cxFrame + 60} y1={baseY} x2={cxFrame + 60 + q * 0.8} y2={beamY} stroke={INK} strokeWidth={1.7} />
+        <rect x={beamMidX - beamW / 2} y={beamY - 18} width={beamW} height={18} fill={PAPER_BG} stroke={INK} strokeWidth={1.7} />
+        <circle cx={cxFrame - 60} cy={baseY} r={2.4} fill={INK} />
+        <circle cx={cxFrame + 60} cy={baseY} r={2.4} fill={INK} />
+
+        <g opacity={Math.min(1, smoothstep(0.4, 1.0, localTime))}>
+          <line x1={beamMidX} y1={beamY - 30} x2={beamMidX + 26} y2={beamY - 30} stroke={INK} strokeWidth={1} />
+          <polygon points={`${beamMidX + 32},${beamY - 30} ${beamMidX + 24},${beamY - 33} ${beamMidX + 24},${beamY - 27}`} fill={INK} />
+          <text x={beamMidX + 36} y={beamY - 26} fill={INK} fontFamily={SERIF} fontSize={15} fontStyle="italic">q</text>
+        </g>
+      </g>
+
+      {showSensor1 && (
+        <g>
+          <rect x={cxFrame - 116} y={baseY - 28} width={36} height={20} fill={PAPER_BG} stroke={INK} strokeWidth={1.25} />
+          <line x1={cxFrame - 80} y1={baseY - 18} x2={cxFrame - 60} y2={baseY - 18} stroke={INK} strokeWidth={1.25} />
+          <circle cx={cxFrame - 60} cy={baseY - 18} r={2.2} fill={INK} />
+          <polygon points={`${cxFrame - 124},${baseY} ${cxFrame - 108},${baseY} ${cxFrame - 116},${baseY - 8}`} fill={INK} />
+          <text x={cxFrame - 98} y={baseY + 24} fill={INK_DIM} fontFamily={SANS} fontSize={9} fontWeight={500}
+            letterSpacing="0.08em" textAnchor="middle" style={{ textTransform: 'uppercase' }}>force transducer</text>
+          <Tex tex="y_k^{u} = u_k + \varepsilon_k^{u}" x={cxFrame - 98} y={baseY + 42} anchor="middle" fontSize={14} />
+        </g>
+      )}
+
+      {showSensor2 && (
+        <g>
+          <rect x={beamMidX - 11} y={beamY - 30} width={22} height={12} fill={PAPER_BG} stroke={INK} strokeWidth={1.25} />
+          <circle cx={beamMidX} cy={beamY - 24} r={2.2} fill={INK} />
+          <line x1={beamMidX + 11} y1={beamY - 24} x2={290} y2={beamY - 90} stroke={INK_DIM} strokeWidth={0.8} />
+          <text x={294} y={beamY - 90} fill={INK_DIM} fontFamily={SANS} fontSize={9} fontWeight={500}
+            letterSpacing="0.08em" style={{ textTransform: 'uppercase' }}>response sensor</text>
+          <Tex tex="y_k^{r} = H_r\, x_k + \varepsilon_k^{r}" x={294} y={beamY - 70} anchor="start" fontSize={14} />
+        </g>
+      )}
+
+      {showStateLabel && (
+        <g opacity={smoothstep(0, 0.6, localTime - 4.2)}>
+          <Tex tex="x(t) = [\, q,\; \dot q,\; \ddot q \,]" x={cxFrame} y={baseY + 66} anchor="middle" fontSize={16} />
+          <text x={cxFrame} y={baseY + 88} fill={INK_DIM} fontFamily={SANS} fontSize={9.5} letterSpacing="0.10em"
+            textAnchor="middle" style={{ textTransform: 'uppercase' }}>state trajectory</text>
+        </g>
+      )}
+
+      {showTraces1 && (
+        <g opacity={smoothstep(0, 0.5, localTime - 1.9)}>
+          <TraceCard x={460} y={140} w={440} h={108} time={time} signalFn={u_signal}
+            noiseAmp={0.30} noiseSeed={2.4} label="input channel  ·  excitation" mathLabel="u(t)" />
+        </g>
+      )}
+      {showTraces2 && (
+        <g opacity={smoothstep(0, 0.5, localTime - 3.1)}>
+          <TraceCard x={460} y={300} w={440} h={108} time={time} signalFn={q_signal}
+            noiseAmp={0.26} noiseSeed={5.7} label="response channel  ·  displacement" mathLabel="q(t)" />
+        </g>
+      )}
+
+      {showTraces1 && (
+        <Arrow x1={cxFrame - 80} y1={baseY - 18} x2={458} y2={194}
+          color={INK_FAINT} width={0.9} dashed opacity={smoothstep(0, 0.5, localTime - 2.1)} head={false} />
+      )}
+      {showTraces2 && (
+        <Arrow x1={beamMidX + 14} y1={beamY - 24} x2={458} y2={350}
+          color={INK_FAINT} width={0.9} dashed opacity={smoothstep(0, 0.5, localTime - 3.3)} head={false} />
+      )}
+
+      {showTraces2 && (
+        <g transform="translate(700, 432)" opacity={smoothstep(0, 0.6, localTime - 4.5)}>
+          <line x1={0} y1={0} x2={20} y2={0} stroke={INK} strokeWidth={1.4} />
+          <text x={26} y={3} fill={INK_DIM} fontFamily={SANS} fontSize={10}>true signal</text>
+          <line x1={108} y1={0} x2={128} y2={0} stroke={RED} strokeWidth={1.2} />
+          <text x={134} y={3} fill={INK_DIM} fontFamily={SANS} fontSize={10}>measurement noise</text>
+          <Tex tex="\varepsilon" x={240} y={4} anchor="start" fontSize={12} color={RED} />
+        </g>
+      )}
+    </g>
+  );
+}
+
+function Scene2() {
+  const time = useTime();
+  const { localTime } = useSprite();
+
+  const showU   = localTime > 0.2;
+  const showA1  = localTime > 1.0;
+  const showODE = localTime > 1.4;
+  const showA2  = localTime > 2.2;
+  const showQ   = localTime > 2.6;
+  const showA3  = localTime > 3.4;
+  const showEta = localTime > 3.8;
+  const propStart = 5.0;
+  const propEnd = 9.5;
+  const contamProgress = smoothstep(propStart, propEnd, localTime);
+  const droplets = [];
+  const numDrops = 5;
+  for (let i = 0; i < numDrops; i++) {
+    const phase = ((localTime - propStart) * 0.45 + i / numDrops) % 1;
+    if (localTime > propStart - 0.1 && phase < 1.05) droplets.push({ phase, key: i });
+  }
+
+  const cy = 246;
+  const w = 116, h = 56;
+  const xs = [80, 280, 510, 740];
+
+  const chainPath = `M ${xs[0] + w} ${cy + h/2} L ${xs[1]} ${cy + h/2}
+                     M ${xs[1] + w} ${cy + h/2} L ${xs[2]} ${cy + h/2}
+                     M ${xs[2] + w} ${cy + h/2} L ${xs[3]} ${cy + h/2}`;
+
+  const segs = [
+    [xs[0] + w, xs[1]],
+    [xs[1] + w, xs[2]],
+    [xs[2] + w, xs[3]],
+  ];
+  const sampleAlong = (p) => {
+    const totalSeg = segs.length;
+    const k = Math.min(totalSeg - 1, Math.floor(p * totalSeg));
+    const localP = (p * totalSeg) - k;
+    const [a, b] = segs[k];
+    return { x: a + (b - a) * localP, y: cy + h / 2 };
+  };
+
+  const etaPlotX = 740, etaPlotY = 360, etaPlotW = 180, etaPlotH = 80;
+  const uPlotX = 80, uPlotY = 360, uPlotW = 180, uPlotH = 80;
+
+  return (
+    <g>
+      <S x={48} y={56} size={10} color={INK_DIM} tracking="0.16em" text="02 · Standard GPLFM" />
+      <line x1={48} y1={66} x2={134} y2={66} stroke={INK} strokeWidth={1} />
+
+      <path d={chainPath} stroke={INK} strokeWidth={1.25} fill="none" opacity={0} />
+
+      {showA1 && <Arrow x1={xs[0] + w} y1={cy + h/2} x2={xs[1] - 4} y2={cy + h/2} color={INK} width={1.25} />}
+      {showA2 && <Arrow x1={xs[1] + w} y1={cy + h/2} x2={xs[2] - 4} y2={cy + h/2} color={INK} width={1.25} />}
+      {showA3 && <Arrow x1={xs[2] + w} y1={cy + h/2} x2={xs[3] - 4} y2={cy + h/2} color={INK} width={1.25} />}
+
+      {localTime > propStart && droplets.map(d => {
+        if (d.phase < 0 || d.phase > 1) return null;
+        const p = sampleAlong(d.phase);
+        return <circle key={d.key} cx={p.x} cy={p.y} r={4.2} fill={RED} opacity={0.78} />;
+      })}
+
+      {showU && (
+        <g opacity={smoothstep(0, 0.4, localTime - 0.2)}>
+          <NodeBox x={xs[0]} y={cy} w={w} h={h} label="measured input">
+            <Tex tex="u(t) + \textcolor{#A23A2E}{\varepsilon^{u}}" x={w/2} y={h/2} anchor="middle" fontSize={18} />
+          </NodeBox>
+        </g>
+      )}
+      {showODE && (
+        <g opacity={smoothstep(0, 0.4, localTime - 1.4)}>
+          <NodeBox x={xs[1]} y={cy} w={w} h={h} label="forward solve">
+            <text x={w/2} y={h/2 - 2} fill={INK} fontFamily={SANS} fontSize={11} fontWeight={500} textAnchor="middle"
+              letterSpacing="0.04em" style={{ textTransform: 'uppercase' }}>ODE integrator</text>
+            <Tex tex="M\ddot q + C\dot q + Kq = u" x={w/2} y={h/2 + 14} anchor="middle" fontSize={9.5} color={INK_DIM} />
+          </NodeBox>
+        </g>
+      )}
+      {showQ && (
+        <g opacity={smoothstep(0, 0.4, localTime - 2.6)}>
+          <NodeBox x={xs[2]} y={cy} w={w} h={h} label="model output">
+            <Tex tex="q(t)" x={w/2} y={h/2} anchor="middle" fontSize={20} />
+          </NodeBox>
+        </g>
+      )}
+      {showEta && (
+        <g opacity={smoothstep(0, 0.4, localTime - 3.8)}>
+          <NodeBox x={xs[3]} y={cy} w={w} h={h} label="inferred discrepancy"
+            stroke={contamProgress > 0.05 ? RED : INK}
+            strokeWidth={contamProgress > 0.05 ? 1.7 : 1.25}>
+            <Tex tex="\eta(t)" x={w/2} y={h/2 - 4} anchor="middle" fontSize={20} />
+            <text x={w/2} y={h - 8} fill={RED} fontFamily={SANS} fontSize={9.5} fontWeight={500}
+              textAnchor="middle" letterSpacing="0.08em" opacity={contamProgress}
+              style={{ textTransform: 'uppercase' }}>contaminated</text>
+          </NodeBox>
+        </g>
+      )}
+
+      {showU && (
+        <g opacity={smoothstep(0, 0.5, localTime - 0.6)}>
+          <defs>
+            <clipPath id="uPlotClip">
+              <rect x={uPlotX} y={uPlotY} width={uPlotW} height={uPlotH} />
+            </clipPath>
+          </defs>
+          <text x={uPlotX + uPlotW / 2} y={uPlotY - 8} fill={INK_DIM} fontFamily={SANS} fontSize={9.5} fontWeight={500}
+            letterSpacing="0.10em" textAnchor="middle" style={{ textTransform: 'uppercase' }}>NOISY EXCITATION</text>
+          <Tex tex="y^{u}" x={uPlotX + uPlotW - 6} y={uPlotY - 12} anchor="end" fontSize={13} />
+          <rect x={uPlotX} y={uPlotY} width={uPlotW} height={uPlotH} fill="rgba(255,255,255,0.45)" stroke={RULE} strokeWidth={1} />
+          <g clipPath="url(#uPlotClip)">
+            <path d={tracePath(uPlotX, uPlotX + uPlotW, uPlotY + uPlotH/2, uPlotH * 0.8, time - 4, time, noisy(u_signal, 2.4, 0.30))}
+              fill="none" stroke={RED} strokeWidth={1} opacity={0.9} />
+            <path d={tracePath(uPlotX, uPlotX + uPlotW, uPlotY + uPlotH/2, uPlotH * 0.8, time - 4, time, u_signal)}
+              fill="none" stroke={INK} strokeWidth={1.3} />
+          </g>
+        </g>
+      )}
+
+      {showEta && (
+        <g opacity={smoothstep(0, 0.5, localTime - 4.2)}>
+          <defs>
+            <clipPath id="etaPlotClip">
+              <rect x={etaPlotX} y={etaPlotY} width={etaPlotW} height={etaPlotH} />
+            </clipPath>
+          </defs>
+          <text x={etaPlotX + etaPlotW / 2} y={etaPlotY - 8} fill={INK_DIM} fontFamily={SANS} fontSize={9.5} fontWeight={500}
+            letterSpacing="0.10em" textAnchor="middle" style={{ textTransform: 'uppercase' }}>INFERRED</text>
+          <Tex tex="\eta(t)" x={etaPlotX + etaPlotW - 6} y={etaPlotY - 12} anchor="end" fontSize={13} />
+          <rect x={etaPlotX} y={etaPlotY} width={etaPlotW} height={etaPlotH} fill="rgba(255,255,255,0.45)"
+            stroke={contamProgress > 0.05 ? RED : RULE} strokeWidth={contamProgress > 0.05 ? 1.2 : 1} />
+          <g clipPath="url(#etaPlotClip)">
+            <path d={tracePath(etaPlotX, etaPlotX + etaPlotW, etaPlotY + etaPlotH/2, etaPlotH * 0.55, time - 4, time,
+              (tt) => eta_drift(tt, contamProgress * 0.6))}
+              fill="none" stroke={contamProgress > 0.05 ? RED : INK} strokeWidth={1.2} opacity={0.9} />
+            <path d={tracePath(etaPlotX, etaPlotX + etaPlotW, etaPlotY + etaPlotH/2, etaPlotH * 0.55, time - 4, time, eta_true)}
+              fill="none" stroke={INK} strokeWidth={1} opacity={0.35} strokeDasharray="3 3" />
+          </g>
+        </g>
+      )}
+
+      {localTime > propStart + 0.5 && (
+        <g opacity={smoothstep(propStart + 0.5, propStart + 1.5, localTime)}>
+          <text x={CW / 2} y={188} fill={RED} fontFamily={SANS} fontSize={12} textAnchor="middle"
+            letterSpacing="0.08em" style={{ textTransform: 'uppercase' }}>INPUT NOISE PROPAGATES THROUGH THE SOLVE</text>
+          <Tex tex="\varepsilon^{u}\;\to\;\eta(t)" x={CW / 2} y={210} anchor="middle" fontSize={15} color={RED} />
+        </g>
+      )}
+    </g>
+  );
+}
+
+function Scene3() {
+  const time = useTime();
+  const { localTime } = useSprite();
+
+  const intro = smoothstep(0.0, 1.2, localTime);
+  const showFan = localTime > 1.4;
+  const fanProgress = smoothstep(1.4, 3.6, localTime);
+  const showBar = localTime > 4.0;
+  const showSideArrows = localTime > 5.0;
+  const barLightProgress = smoothstep(6.0, 7.0, localTime) - smoothstep(7.4, 8.4, localTime);
+  const collapse = smoothstep(7.0, 9.0, localTime);
+
+  const xNodeL = 130, xNodeR = 610, yNodeTop = 120;
+  const nodeW = 220, nodeH = 130;
+  const barY = 350;
+  const barH = 60;
+  const barX = 200, barW = 560;
+  const barCx = barX + barW / 2;
+
+  const renderFan = (cx, cy, w, h, seedOffset, collapseAmt) => {
+    const curves = [];
+    const nCurves = 7;
+    for (let k = 0; k < nCurves; k++) {
+      const seed = seedOffset + k * 1.7;
+      const d = tracePath(cx, cx + w, cy + h / 2, h * 0.7, 0, 4,
+        (t) => {
+          const baseEnv = Math.sin(t * 1.8 + seed) * 0.4 + Math.sin(t * 4.7 + seed * 2.1) * 0.22 + Math.sin(t * 9.1 + seed * 0.7) * 0.12;
+          const meanCurve = Math.sin(t * 1.8) * 0.4;
+          const spread = lerp(baseEnv, meanCurve, collapseAmt);
+          return spread;
+        }, 80);
+      curves.push(d);
+    }
+    return { curves };
+  };
+
+  const fanL = renderFan(xNodeL + 12, yNodeTop + 12, nodeW - 24, nodeH - 24, 7.1, collapse);
+  const fanR = renderFan(xNodeR + 12, yNodeTop + 12, nodeW - 24, nodeH - 24, 13.7, collapse);
+
+  const renderBand = (cx, cy, w, h) => {
+    const upper = [], lower = [];
+    const N = 60;
+    for (let i = 0; i < N; i++) {
+      const u = i / (N - 1);
+      const t = u * 4;
+      const mean = Math.sin(t * 1.8) * 0.4;
+      const width = 0.28 * (1 - 0.6 * collapse);
+      const x = cx + u * w;
+      const yU = cy + h / 2 - (mean + width) * h * 0.7 * 0.5;
+      const yL = cy + h / 2 - (mean - width) * h * 0.7 * 0.5;
+      upper.push([x, yU]);
+      lower.push([x, yL]);
+    }
+    let d = '';
+    upper.forEach(([x, y], i) => { d += (i === 0 ? 'M' : 'L') + x + ' ' + y + ' '; });
+    for (let i = lower.length - 1; i >= 0; i--) {
+      const [x, y] = lower[i];
+      d += 'L' + x + ' ' + y + ' ';
+    }
+    d += 'Z';
+    let meanD = '';
+    for (let i = 0; i < N; i++) {
+      const u = i / (N - 1);
+      const t = u * 4;
+      const mean = Math.sin(t * 1.8) * 0.4;
+      const x = cx + u * w;
+      const y = cy + h / 2 - mean * h * 0.7 * 0.5;
+      meanD += (i === 0 ? 'M' : 'L') + x + ' ' + y + ' ';
+    }
+    return { band: d, mean: meanD };
+  };
+
+  const bandL = renderBand(xNodeL + 12, yNodeTop + 12, nodeW - 24, nodeH - 24);
+  const bandR = renderBand(xNodeR + 12, yNodeTop + 12, nodeW - 24, nodeH - 24);
+
+  const conn = (x1, y1, x2, y2) => (
+    <line x1={x1} y1={y1} x2={x2} y2={y2}
+      stroke={INK} strokeWidth={1.25} opacity={smoothstep(0, 1, intro) * 0.85} />
+  );
+
+  const barStroke = lerp(0, 1, barLightProgress) > 0.05 ? TEAL : INK;
+  const barFill = barLightProgress > 0.05 ? `rgba(44,122,123,${0.05 + 0.10 * barLightProgress})` : 'rgba(255,255,255,0.45)';
+
+  return (
+    <g>
+      <S x={48} y={56} size={10} color={INK_DIM} tracking="0.16em" text="03 · Physics-as-measurement" />
+      <line x1={48} y1={66} x2={170} y2={66} stroke={INK} strokeWidth={1} />
+
+      <g opacity={intro}>
+        {conn(xNodeL + nodeW / 2, yNodeTop + nodeH, barX + 40, barY)}
+        {conn(xNodeR + nodeW / 2, yNodeTop + nodeH, barX + barW - 40, barY)}
+      </g>
+
+      <g opacity={intro}>
+        <text x={xNodeL + nodeW / 2} y={yNodeTop - 26} fill={INK_DIM} fontFamily={SANS} fontSize={9.5}
+          fontWeight={500} letterSpacing="0.10em" textAnchor="middle" style={{ textTransform: 'uppercase' }}>
+          GP PRIOR  ·  STATE
+        </text>
+        <foreignObject x={xNodeL} y={yNodeTop - 18} width={nodeW} height={18} style={{ overflow: 'visible' }}>
+          <div xmlns="http://www.w3.org/1999/xhtml" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: INK, fontSize: 14, fontFamily: SERIF }}>
+            <TexInline tex="x(t)\sim \mathcal{GP}\,,\ \mathrm{Mat\acute{e}rn}" />
+          </div>
+        </foreignObject>
+        <rect x={xNodeL} y={yNodeTop} width={nodeW} height={nodeH} fill="rgba(255,255,255,0.45)" stroke={INK} strokeWidth={1.25} />
+        {showFan && (
+          <g opacity={fanProgress}>
+            {fanL.curves.map((d, i) => (
+              <path key={i} d={d} fill="none" stroke={INK} strokeWidth={i === 0 ? 1.2 : 0.7}
+                opacity={i === 0 ? 1 : (1 - 0.55 * collapse) * 0.45} />
+            ))}
+            {collapse > 0.02 && (
+              <g>
+                <path d={bandL.band} fill={TEAL_SOFT} opacity={collapse} />
+                <path d={bandL.mean} fill="none" stroke={TEAL} strokeWidth={1.4} opacity={collapse} />
+              </g>
+            )}
+          </g>
+        )}
+      </g>
+
+      <g opacity={intro}>
+        <text x={xNodeR + nodeW / 2} y={yNodeTop - 26} fill={INK_DIM} fontFamily={SANS} fontSize={9.5}
+          fontWeight={500} letterSpacing="0.10em" textAnchor="middle" style={{ textTransform: 'uppercase' }}>
+          GP PRIOR  ·  MFE
+        </text>
+        <foreignObject x={xNodeR} y={yNodeTop - 18} width={nodeW} height={18} style={{ overflow: 'visible' }}>
+          <div xmlns="http://www.w3.org/1999/xhtml" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: INK, fontSize: 14, fontFamily: SERIF }}>
+            <TexInline tex="\eta(t)\sim \mathcal{GP}\,,\ \mathrm{Mat\acute{e}rn}" />
+          </div>
+        </foreignObject>
+        <rect x={xNodeR} y={yNodeTop} width={nodeW} height={nodeH} fill="rgba(255,255,255,0.45)" stroke={INK} strokeWidth={1.25} />
+        {showFan && (
+          <g opacity={fanProgress}>
+            {fanR.curves.map((d, i) => (
+              <path key={i} d={d} fill="none" stroke={INK} strokeWidth={i === 0 ? 1.2 : 0.7}
+                opacity={i === 0 ? 1 : (1 - 0.55 * collapse) * 0.45} />
+            ))}
+            {collapse > 0.02 && (
+              <g>
+                <path d={bandR.band} fill={TEAL_SOFT} opacity={collapse} />
+                <path d={bandR.mean} fill="none" stroke={TEAL} strokeWidth={1.4} opacity={collapse} />
+              </g>
+            )}
+          </g>
+        )}
+      </g>
+
+      {showBar && (
+        <g opacity={smoothstep(0, 0.6, localTime - 4.0)}>
+          <text x={barCx} y={barY - 12} fill={INK_DIM} fontFamily={SANS} fontSize={9.5}
+            fontWeight={500} letterSpacing="0.10em" textAnchor="middle" style={{ textTransform: 'uppercase' }}>
+            ALGEBRAIC CONSTRAINT  ·  MEASUREMENT MODEL
+          </text>
+          <rect x={barX} y={barY} width={barW} height={barH}
+            fill={barFill} stroke={barStroke} strokeWidth={barLightProgress > 0.05 ? 2 : 1.5} />
+          <Tex tex="M\ddot q + C\dot q + Kq + S_p\,\eta \;=\; S_u\,u"
+            x={barCx} y={barY + barH / 2} anchor="middle" verticalAlign="middle" fontSize={19} />
+        </g>
+      )}
+
+      {showSideArrows && (
+        <g opacity={smoothstep(0, 0.6, localTime - 5.0)}>
+          <foreignObject x={10} y={barY + barH/2 - 14} width={140} height={28} style={{ overflow: 'visible' }}>
+            <div xmlns="http://www.w3.org/1999/xhtml" style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-end', height: '100%',
+              color: INK, fontSize: 18, fontFamily: SERIF,
+            }}>
+              <TexInline tex="y^{u} + \textcolor{#A23A2E}{\varepsilon^{u}}" />
+            </div>
+          </foreignObject>
+          <Arrow x1={152} y1={barY + barH / 2} x2={barX - 4} y2={barY + barH / 2} color={INK} width={1.3} />
+
+          <foreignObject x={CW - 150} y={barY + barH/2 - 14} width={140} height={28} style={{ overflow: 'visible' }}>
+            <div xmlns="http://www.w3.org/1999/xhtml" style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-start', height: '100%',
+              color: INK, fontSize: 18, fontFamily: SERIF,
+            }}>
+              <TexInline tex="y^{r} + \textcolor{#A23A2E}{\varepsilon^{r}}" />
+            </div>
+          </foreignObject>
+          <Arrow x1={CW - 152} y1={barY + barH / 2} x2={barX + barW + 4} y2={barY + barH / 2} color={INK} width={1.3} />
+        </g>
+      )}
+
+      {localTime > 8.5 && (
+        <g opacity={smoothstep(8.5, 9.5, localTime)}>
+          <Tex tex="s(t) = \bigl[\, x(t)\,;\; \eta(t)\, \bigr]"
+            x={CW / 2} y={barY + barH + 30} anchor="middle" fontSize={16} />
+          <text x={CW / 2} y={barY + barH + 54} fill={INK_DIM} fontFamily={SANS} fontSize={9.5}
+            letterSpacing="0.10em" textAnchor="middle" style={{ textTransform: 'uppercase' }}>
+            augmented state
+          </text>
+        </g>
+      )}
+    </g>
+  );
+}
+
+function Scene4() {
+  const time = useTime();
+  const { localTime } = useSprite();
+
+  const intro = smoothstep(0, 0.8, localTime);
+  const drawSweep = smoothstep(0.8, 5.8, localTime);
+  const showInset = localTime > 2.6;
+  const insetProgress = smoothstep(2.6, 5.6, localTime);
+
+  const panelX = 60, panelW = 560;
+  const p1Y = 110, p1H = 130;
+  const p2Y = 268, p2H = 130;
+
+  const tA = 0, tB = 10;
+  const tCurrent = tA + (tB - tA) * drawSweep;
+
+  const buildBandAndMean = (px, py, pw, ph, signalFn, bandWidth = 0.18) => {
+    const N = 100;
+    const upper = [], lower = [], meanPts = [];
+    for (let i = 0; i < N; i++) {
+      const u = i / (N - 1);
+      const t = tA + (tB - tA) * u;
+      const m = signalFn(t);
+      const x = px + u * pw;
+      const yU = py + ph / 2 - (m + bandWidth) * ph * 0.4;
+      const yL = py + ph / 2 - (m - bandWidth) * ph * 0.4;
+      const yM = py + ph / 2 - m * ph * 0.4;
+      upper.push([x, yU]); lower.push([x, yL]); meanPts.push([x, yM]);
+    }
+    let band = '';
+    upper.forEach(([x, y], i) => { band += (i === 0 ? 'M' : 'L') + x + ' ' + y + ' '; });
+    for (let i = lower.length - 1; i >= 0; i--) band += 'L' + lower[i][0] + ' ' + lower[i][1] + ' ';
+    band += 'Z';
+    let mean = '';
+    meanPts.forEach(([x, y], i) => { mean += (i === 0 ? 'M' : 'L') + x + ' ' + y + ' '; });
+    return { band, mean };
+  };
+
+  const sweepX = panelX + panelW * drawSweep;
+
+  const stateBM = buildBandAndMean(panelX, p1Y, panelW, p1H, q_signal, 0.16);
+  const etaBM   = buildBandAndMean(panelX, p2Y, panelW, p2H, eta_true,  0.22);
+
+  const truePath = (py, ph, signalFn) => {
+    let d = '';
+    const N = 100;
+    for (let i = 0; i < N; i++) {
+      const u = i / (N - 1);
+      const t = tA + (tB - tA) * u;
+      const x = panelX + u * panelW;
+      const y = py + ph / 2 - signalFn(t) * ph * 0.4;
+      d += (i === 0 ? 'M' : 'L') + x + ' ' + y + ' ';
+    }
+    return d;
+  };
+
+  const insX = 680, insY = 320, insW = 230, insH = 150;
+
+  return (
+    <g>
+      <S x={48} y={56} size={10} color={INK_DIM} tracking="0.16em" text="04 · Posterior  ·  O(N) inference" />
+      <line x1={48} y1={66} x2={216} y2={66} stroke={INK} strokeWidth={1} />
+
+      <defs>
+        <clipPath id="sweepClip">
+          <rect x={panelX} y={p1Y - 4} width={Math.max(0, sweepX - panelX)} height={p1H + 8} />
+        </clipPath>
+        <clipPath id="sweepClip2">
+          <rect x={panelX} y={p2Y - 4} width={Math.max(0, sweepX - panelX)} height={p2H + 8} />
+        </clipPath>
+      </defs>
+
+      <g opacity={intro}>
+        <text x={panelX} y={p1Y - 12} fill={INK_DIM} fontFamily={SANS} fontSize={9.5}
+          fontWeight={500} letterSpacing="0.10em" style={{ textTransform: 'uppercase' }}>
+          state  ·  posterior on q(t)
+        </text>
+        <rect x={panelX} y={p1Y} width={panelW} height={p1H} fill="rgba(255,255,255,0.45)" stroke={RULE} strokeWidth={1} />
+        <line x1={panelX} y1={p1Y + p1H / 2} x2={panelX + panelW} y2={p1Y + p1H / 2} stroke={RULE_SOFT} strokeWidth={1} strokeDasharray="2 3" />
+        <path d={truePath(p1Y, p1H, q_signal)} fill="none" stroke={INK} strokeWidth={1} opacity={0.45} strokeDasharray="4 3" />
+        <g clipPath="url(#sweepClip)">
+          <path d={stateBM.band} fill={TEAL_SOFT} />
+          <path d={stateBM.mean} fill="none" stroke={TEAL} strokeWidth={1.6} />
+        </g>
+        {drawSweep > 0.02 && drawSweep < 0.99 && (
+          <line x1={sweepX} y1={p1Y} x2={sweepX} y2={p1Y + p1H} stroke={TEAL} strokeWidth={1} opacity={0.5} />
+        )}
+      </g>
+
+      <g opacity={intro}>
+        <text x={panelX} y={p2Y - 12} fill={INK_DIM} fontFamily={SANS} fontSize={9.5}
+          fontWeight={500} letterSpacing="0.10em">
+          MODEL-FORM ERROR  ·  POSTERIOR ON  η(t)
+        </text>
+        <rect x={panelX} y={p2Y} width={panelW} height={p2H} fill="rgba(255,255,255,0.45)" stroke={RULE} strokeWidth={1} />
+        <line x1={panelX} y1={p2Y + p2H / 2} x2={panelX + panelW} y2={p2Y + p2H / 2} stroke={RULE_SOFT} strokeWidth={1} strokeDasharray="2 3" />
+        <path d={truePath(p2Y, p2H, eta_true)} fill="none" stroke={INK} strokeWidth={1} opacity={0.45} strokeDasharray="4 3" />
+        <g clipPath="url(#sweepClip2)">
+          <path d={etaBM.band} fill={TEAL_SOFT} />
+          <path d={etaBM.mean} fill="none" stroke={TEAL} strokeWidth={1.6} />
+        </g>
+        {drawSweep > 0.02 && drawSweep < 0.99 && (
+          <line x1={sweepX} y1={p2Y} x2={sweepX} y2={p2Y + p2H} stroke={TEAL} strokeWidth={1} opacity={0.5} />
+        )}
+      </g>
+
+      <g transform={`translate(${panelX}, ${p2Y + p2H + 18})`} opacity={intro}>
+        <line x1={0} y1={0} x2={20} y2={0} stroke={INK} strokeWidth={1} strokeDasharray="4 3" />
+        <text x={26} y={3} fill={INK_DIM} fontFamily={SANS} fontSize={10}>true  η(t)</text>
+        <line x1={120} y1={0} x2={140} y2={0} stroke={TEAL} strokeWidth={1.6} />
+        <text x={146} y={3} fill={INK_DIM} fontFamily={SANS} fontSize={10}>posterior mean</text>
+        <rect x={260} y={-4} width={20} height={8} fill={TEAL_SOFT} />
+        <text x={286} y={3} fill={INK_DIM} fontFamily={SANS} fontSize={10}>95% credible band</text>
+      </g>
+
+      {showInset && (
+        <g opacity={smoothstep(0, 0.5, localTime - 2.6)}>
+          <text x={insX} y={insY - 14} fill={INK_DIM} fontFamily={SANS} fontSize={9.5}
+            fontWeight={500} letterSpacing="0.10em" style={{ textTransform: 'uppercase' }}>
+            runtime scaling  ·  log–log
+          </text>
+          <rect x={insX} y={insY} width={insW} height={insH} fill="rgba(255,255,255,0.55)" stroke={RULE} strokeWidth={1} />
+
+          {[0, 1, 2, 3].map(i => (
+            <line key={'gx' + i} x1={insX + (i + 0.5) * (insW / 4)} y1={insY} x2={insX + (i + 0.5) * (insW / 4)} y2={insY + insH}
+              stroke={RULE_SOFT} strokeWidth={0.6} />
+          ))}
+          {[0, 1, 2].map(i => (
+            <line key={'gy' + i} x1={insX} y1={insY + (i + 0.5) * (insH / 3)} x2={insX + insW} y2={insY + (i + 0.5) * (insH / 3)}
+              stroke={RULE_SOFT} strokeWidth={0.6} />
+          ))}
+
+          <text x={insX + insW / 2} y={insY + insH + 14} fill={INK_DIM} fontFamily={SERIF} fontSize={11} fontStyle="italic" textAnchor="middle">log N</text>
+          <text x={insX - 6} y={insY + insH / 2} fill={INK_DIM} fontFamily={SERIF} fontSize={11} fontStyle="italic"
+            textAnchor="end" transform={`rotate(-90 ${insX - 6} ${insY + insH / 2})`}>log  time</text>
+
+          <path
+            d={`M ${insX + 12} ${insY + insH - 18}
+                L ${insX + insW - 12} ${insY + 20}`}
+            fill="none" stroke={INK} strokeWidth={1.4}
+            strokeDasharray={`${260 * insetProgress} 999`}
+          />
+          <text x={insX + insW - 16} y={insY + 32} fill={INK} fontFamily={SERIF} fontSize={13} fontStyle="italic"
+            textAnchor="end" opacity={insetProgress}>O(N³)</text>
+
+          <path
+            d={`M ${insX + 12} ${insY + insH - 18}
+                L ${insX + insW - 12} ${insY + insH - 72}`}
+            fill="none" stroke={TEAL} strokeWidth={1.8}
+            strokeDasharray={`${260 * insetProgress} 999`}
+          />
+          <text x={insX + insW - 16} y={insY + insH - 70} fill={TEAL} fontFamily={SERIF} fontSize={13} fontStyle="italic"
+            textAnchor="end" opacity={insetProgress}>O(N)</text>
+
+          <text x={insX + 12} y={insY + insH - 6} fill={INK_DIM} fontFamily={SANS} fontSize={9}
+            letterSpacing="0.06em" style={{ textTransform: 'uppercase' }}>
+            kf + rts pass
+          </text>
+        </g>
+      )}
+
+      {localTime > 6.0 && (
+        <g opacity={smoothstep(6.0, 7.0, localTime)}>
+          <foreignObject x={panelX} y={p2Y + p2H + 46} width={panelW} height={28} style={{ overflow: 'visible' }}>
+            <div xmlns="http://www.w3.org/1999/xhtml" style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%',
+              color: INK, fontSize: 15, fontFamily: SERIF,
+            }}>
+              <span style={{ fontFamily: SANS, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: INK_DIM, marginRight: 10 }}>
+                ONE KALMAN + RTS PASS OVER
+              </span>
+              <TexInline tex="s(t)=[\,x(t)\,;\;\eta(t)\,]" />
+            </div>
+          </foreignObject>
+        </g>
+      )}
+    </g>
+  );
+}
+
+function Captions({ enabled }) {
+  const time = useTime();
+  let active = CAPTIONS[0];
+  for (const c of CAPTIONS) if (time >= c.t) active = c;
+  if (!enabled) return null;
+  return (
+    <div style={{
+      position: 'absolute', left: 48, right: 48, bottom: 22,
+      color: INK, fontFamily: SANS, fontSize: 14, fontWeight: 400,
+      letterSpacing: '-0.005em', textAlign: 'center', pointerEvents: 'none',
+    }}>
+      <div style={{
+        display: 'inline-block', padding: '7px 14px',
+        background: 'rgba(245,241,232,0.85)',
+        border: `1px solid ${RULE_SOFT}`, borderRadius: 3,
+        backdropFilter: 'blur(2px)',
+      }}>
+        {active.text}
+      </div>
+    </div>
+  );
+}
+
+function Signature() {
+  return (
+    <g>
+      <text x={CW - 24} y={28} fill={INK_FAINT}
+        fontFamily={SANS} fontSize={9} fontWeight={500}
+        letterSpacing="0.18em" textAnchor="end" style={{ textTransform: 'uppercase' }}>
+        KASHYAP · THORAT · NAYEK
+      </text>
+    </g>
+  );
+}
+
+function TimeLabel({ rootRef }) {
+  const time = useTime();
+  React.useEffect(() => {
+    if (rootRef.current) {
+      const s = Math.floor(time);
+      rootRef.current.setAttribute('data-screen-label', `t=${String(s).padStart(2, '0')}s`);
+    }
+  }, [Math.floor(time), rootRef]);
+  return null;
+}
+
+function ReducedView() {
+  const [idx, setIdx] = React.useState(4);
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.code === 'ArrowLeft') { setIdx(i => Math.max(0, i - 1)); e.preventDefault(); }
+      if (e.code === 'ArrowRight') { setIdx(i => Math.min(4, i + 1)); e.preventDefault(); }
+      if (e.code === 'Home' || e.key === '0') setIdx(0);
+      if (e.code === 'End') setIdx(4);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const stamps = [4.0, 12.0, 21.0, 28.0, 38.5];
+  const t = stamps[idx];
+
+  const fakeTimeline = { time: t, duration: TOTAL, playing: false, setTime: () => {}, setPlaying: () => {} };
+
+  const inS1 = t >= T.S1[0] && t < T.S1[1];
+  const inS2 = t >= T.S2[0] && t < T.S2[1];
+  const inS3 = t >= T.S3[0] && t < T.S3[1];
+  const inS4 = t >= T.S4[0] && t < T.S4[1];
+
+  const localScene = inS1 ? t - T.S1[0]
+                   : inS2 ? t - T.S2[0]
+                   : inS3 ? t - T.S3[0]
+                   : inS4 ? t - T.S4[0] : 0;
+  const sceneDur = inS1 ? (T.S1[1] - T.S1[0])
+                 : inS2 ? (T.S2[1] - T.S2[0])
+                 : inS3 ? (T.S3[1] - T.S3[0])
+                 : inS4 ? (T.S4[1] - T.S4[0]) : 1;
+
+  const fakeSprite = { localTime: localScene, progress: localScene / sceneDur, duration: sceneDur, visible: true };
+
+  return (
+    <TimelineContext.Provider value={fakeTimeline}>
+      <SpriteContext.Provider value={fakeSprite}>
+        <div style={{ position: 'absolute', inset: 0 }}>
+          <svg viewBox={`0 0 ${CW} ${CH}`} width={CW} height={CH} style={{ display: 'block' }}>
+            {inS1 && <Scene1 />}
+            {inS2 && <Scene2 />}
+            {inS3 && <Scene3 />}
+            {inS4 && <Scene4 />}
+            <Signature />
+          </svg>
+          <Captions enabled={true} />
+          <div style={{
+            position: 'absolute', top: 18, right: 48,
+            fontFamily: SANS, fontSize: 10, color: INK_DIM, letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+          }}>
+            reduced motion  ·  step {idx + 1} / 5  ·  ← →
+          </div>
+        </div>
+      </SpriteContext.Provider>
+    </TimelineContext.Provider>
+  );
+}
+
+function App() {
+  const rootRef = React.useRef(null);
+  const [captionsOn, setCaptionsOn] = React.useState(true);
+  const [reduced, setReduced] = React.useState(() => {
+    try { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    catch { return false; }
+  });
+  const [reducedOverride, setReducedOverride] = React.useState(null);
+
+  const effectiveReduced = reducedOverride == null ? reduced : reducedOverride;
+
+  React.useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = () => setReduced(mq.matches);
+    mq.addEventListener && mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener && mq.removeEventListener('change', onChange);
+  }, []);
+
+  const belowCanvas = (
+    <div style={{
+      width: '100%', maxWidth: 680, alignSelf: 'center',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '6px 4px 0', margin: '0 auto', gap: 12,
+      fontFamily: SANS, fontSize: 11, color: INK_DIM, letterSpacing: '0.04em',
+    }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+        <button onClick={() => setCaptionsOn(v => !v)} style={chromeBtnStyle(captionsOn)}
+          aria-pressed={captionsOn} title="Toggle captions">
+          <span style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            cc  ·  {captionsOn ? 'on' : 'off'}
+          </span>
+        </button>
+        <button onClick={() => setReducedOverride(v => v === true ? false : true)}
+          style={chromeBtnStyle(effectiveReduced)} aria-pressed={effectiveReduced}
+          title="Toggle reduced motion">
+          <span style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+            reduced motion  ·  {effectiveReduced ? 'on' : 'off'}
+          </span>
+        </button>
+      </div>
+      <div style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: INK_FAINT }}>
+        space · play   ·   ← → · seek   ·   0 · restart
+      </div>
+    </div>
+  );
+
+  if (effectiveReduced) {
+    return (
+      <div ref={rootRef} data-screen-label="reduced-motion" style={pageStyle}>
+        <div style={cardStyle}>
+          <div style={{ position: 'relative', width: CW, height: CH, background: PAPER_BG, overflow: 'hidden' }}>
+            <ReducedView />
+          </div>
+          <div style={{ padding: '14px 18px', borderTop: `1px solid ${RULE_SOFT}`, fontFamily: SANS,
+            fontSize: 11, color: INK_DIM, letterSpacing: '0.04em', textAlign: 'center' }}>
+            Reduced-motion mode  ·  final frame shown statically  ·  use ← → to step
+            <button onClick={() => setReducedOverride(false)} style={{ ...chromeBtnStyle(false), marginLeft: 14 }}>
+              <span style={{ fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase' }}>play animation</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={rootRef} data-screen-label="t=00s" style={pageStyle}>
+      <div style={cardStyle}>
+        <Stage
+          width={CW} height={CH} duration={TOTAL}
+          background={PAPER_BG} shellBackground={PAPER_BG}
+          barTheme="light" persistKey="physmeas" loop={true}
+          belowCanvas={belowCanvas}
+        >
+          <TimeLabel rootRef={rootRef} />
+          <Sprite start={T.S1[0]} end={T.S1[1]}><SvgScene><Scene1 /></SvgScene></Sprite>
+          <Sprite start={T.S2[0]} end={T.S2[1]}><SvgScene><Scene2 /></SvgScene></Sprite>
+          <Sprite start={T.S3[0]} end={T.S3[1]}><SvgScene><Scene3 /></SvgScene></Sprite>
+          <Sprite start={T.S4[0]} end={T.S4[1]}><SvgScene><Scene4 /></SvgScene></Sprite>
+
+          <SvgScene>
+            <Signature />
+          </SvgScene>
+
+          <Captions enabled={captionsOn} />
+        </Stage>
+      </div>
+    </div>
+  );
+}
+
+function SvgScene({ children }) {
+  return (
+    <svg viewBox={`0 0 ${CW} ${CH}`} width={CW} height={CH}
+      style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+      {children}
+    </svg>
+  );
+}
+
+const pageStyle = {
+  minHeight: '100vh', width: '100%',
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: PAPER_BG, padding: '32px 24px',
+  boxSizing: 'border-box', fontFamily: SANS,
+};
+
+const cardStyle = {
+  width: 'min(100%, 1040px)', background: PAPER_BG,
+  border: `1px solid ${RULE_SOFT}`, borderRadius: 6, padding: 24,
+  boxShadow: '0 1px 0 rgba(20,17,13,0.04), 0 12px 40px rgba(20,17,13,0.05)',
+  fontFamily: SANS,
+};
+
+function chromeBtnStyle(active) {
+  return {
+    padding: '5px 10px',
+    border: `1px solid ${active ? INK : RULE}`,
+    background: active ? INK : 'transparent',
+    color: active ? PAPER_BG : INK,
+    cursor: 'pointer', borderRadius: 3, fontFamily: SANS,
+  };
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+</body>
+</html>
