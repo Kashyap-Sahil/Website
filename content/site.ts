@@ -3,7 +3,7 @@ export const site = {
   role: "Researcher",
   location: "Delhi, India",
   tagline:
-    "Working on model-form errors, latent forces, and learning from data the parts of physics our equations leave out.",
+    "Teaching equations to admit what they do not know, and building probabilistic models for the physics they leave out.",
   about: [
     "I'm a researcher exploring the boundary between data-driven and physics-based modeling. My work focuses on identifying and correcting the structural gaps that classical models carry — the assumptions baked in long before the data arrives.",
     "Recent work treats model-form error as a latent force: something inferable, separable, and useful, rather than noise to be smoothed over.",
