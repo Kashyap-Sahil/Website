@@ -3,8 +3,11 @@ import { site } from "@/content/site";
 
 export function Nav() {
   return (
-    <header className="mx-auto flex max-w-5xl items-baseline justify-between px-6 pt-10 pb-4 sm:px-10 sm:pt-14">
-      <Link href="/" className="font-serif text-xl tracking-tight sm:text-2xl">
+    <header className="mx-auto flex max-w-5xl items-baseline justify-between gap-6 px-6 pt-10 pb-4 sm:px-10 sm:pt-14">
+      <Link
+        href="/"
+        className="font-serif text-3xl tracking-tight sm:text-4xl md:text-5xl"
+      >
         {site.name}
       </Link>
       <nav className="flex gap-7 text-sm text-muted">
