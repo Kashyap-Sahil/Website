@@ -28,6 +28,15 @@ export const site = {
       embed: "/animation-model-form-errors.html",
       href: "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=0MO0ArAAAAAJ&citation_for_view=0MO0ArAAAAAJ:u5HHmVD_uO8C",
     },
+    {
+      title: "Physics-as-measurement",
+      venue: "Research publication",
+      year: "",
+      summary:
+        "An explainer for treating governing physics as a measurement channel — letting partial, imperfect equations inform inference rather than dictate it.",
+      embed: "/animation-physics-as-measurement.html",
+      href: "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=0MO0ArAAAAAJ&citation_for_view=0MO0ArAAAAAJ:UeHWp8X0CEIC",
+    },
   ],
   projects: [],
 };
