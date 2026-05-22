@@ -1,0 +1,23 @@
+import Link from "next/link";
+import { site } from "@/content/site";
+
+export function Nav() {
+  return (
+    <header className="mx-auto flex max-w-5xl items-baseline justify-between px-6 pt-10 pb-4 sm:px-10 sm:pt-14">
+      <Link href="/" className="font-serif text-lg tracking-tight">
+        {site.name}
+      </Link>
+      <nav className="flex gap-7 text-sm text-muted">
+        <a href="#work" className="hover:text-ink transition-colors">
+          Work
+        </a>
+        <a href="#about" className="hover:text-ink transition-colors">
+          About
+        </a>
+        <a href="#contact" className="hover:text-ink transition-colors">
+          Contact
+        </a>
+      </nav>
+    </header>
+  );
+}

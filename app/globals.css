@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: #f6f3ec;
+  color: #16161a;
+  font-feature-settings: "kern", "liga", "calt";
+}
+
+::selection {
+  background-color: #16161a;
+  color: #f6f3ec;
+}
