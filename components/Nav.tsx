@@ -8,8 +8,8 @@ export function Nav() {
         {site.name}
       </Link>
       <nav className="flex gap-7 text-sm text-muted">
-        <a href="#work" className="hover:text-ink transition-colors">
-          Work
+        <a href="#research" className="hover:text-ink transition-colors">
+          Research
         </a>
         <a href="#about" className="hover:text-ink transition-colors">
           About

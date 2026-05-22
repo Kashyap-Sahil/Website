@@ -1,52 +1,33 @@
 export const site = {
-  name: "Your Name",
-  role: "Designer & Engineer",
-  location: "City, Country",
+  name: "Sahil Kashyap",
+  role: "Researcher",
+  location: "",
   tagline:
-    "I build calm, considered software — websites, tools, and systems that respect attention and time.",
+    "Working on model-form errors, latent forces, and learning from data the parts of physics our equations leave out.",
   about: [
-    "I'm a designer and engineer working at the intersection of product and craft. My work focuses on clarity: stripping things back until what remains is the thing that matters.",
-    "Currently exploring how interfaces can feel less like software and more like furniture — present when needed, quiet otherwise. Previously, I've shipped products across fintech, publishing, and developer tools.",
+    "I'm a researcher exploring the boundary between data-driven and physics-based modeling. My work focuses on identifying and correcting the structural gaps that classical models carry — the assumptions baked in long before the data arrives.",
+    "Recent work treats model-form error as a latent force: something inferable, separable, and useful, rather than noise to be smoothed over.",
   ],
-  email: "hello@example.com",
+  email: "smicrlab@gmail.com",
+  avatar: "/sahil.jpg",
   links: [
-    { label: "Email", href: "mailto:hello@example.com" },
-    { label: "GitHub", href: "https://github.com/" },
-    { label: "LinkedIn", href: "https://linkedin.com/" },
-    { label: "Read.cv", href: "https://read.cv/" },
+    { label: "Email", href: "mailto:smicrlab@gmail.com" },
+    {
+      label: "Google Scholar",
+      href: "https://scholar.google.com/citations?hl=en&user=0MO0ArAAAAAJ",
+    },
+    { label: "GitHub", href: "https://github.com/kashyap-sahil" },
   ],
-  projects: [
+  papers: [
     {
-      title: "Field Notes",
-      year: "2025",
+      title: "Model-form errors as latent forces",
+      venue: "Research publication",
+      year: "",
       summary:
-        "A reading and annotation tool for long-form writing. Designed for focus, with margin notes that sync across devices.",
-      role: "Design, engineering",
-      href: "#",
-    },
-    {
-      title: "Atlas",
-      year: "2024",
-      summary:
-        "An internal design system used across four product teams. Tokens, components, and the documentation that explains why.",
-      role: "Systems design",
-      href: "#",
-    },
-    {
-      title: "Quiet Type",
-      year: "2024",
-      summary:
-        "A small typeface family commissioned for a literary magazine. Two weights, optical sizes, restrained.",
-      role: "Type design",
-      href: "#",
-    },
-    {
-      title: "Ledger",
-      year: "2023",
-      summary:
-        "Personal finance for people who don't enjoy personal finance. A single screen that tells you what you need to know.",
-      role: "Product, engineering",
-      href: "#",
+        "Recasting model-form discrepancy as a latent forcing term — inferred jointly with system states from observed data. An animated abstract is embedded below.",
+      embed: "/animation-model-form-errors.html",
+      href: "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=0MO0ArAAAAAJ&citation_for_view=0MO0ArAAAAAJ:u5HHmVD_uO8C",
     },
   ],
+  projects: [],
 };
