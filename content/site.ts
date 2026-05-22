@@ -33,7 +33,7 @@ export const site = {
       venue: "Research publication",
       year: "",
       summary:
-        "An explainer for treating governing physics as a measurement channel — letting partial, imperfect equations inform inference rather than dictate it.",
+        "Most model discrepancy addressing frameworks assume system inputs (excitation) are known exactly, an assumption that rarely holds in practical sensing environments where both excitation and response measurements are corrupted by noise. This work introduces a physics-as-measurement framework, where governing equations are treated as probabilistic measurement channels rather than rigid deterministic constraints. By jointly integrating noisy input-output measurements with partial governing physics, the framework enables inference of system states and model discrepancies in misspecified dynamical systems.",
       embed: "/animation-physics-as-measurement.html",
       href: "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=0MO0ArAAAAAJ&citation_for_view=0MO0ArAAAAAJ:UeHWp8X0CEIC",
     },
