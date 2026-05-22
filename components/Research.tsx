@@ -46,18 +46,22 @@ export function Research() {
           </div>
 
           {paper.embed ? (
-            <figure className="mt-10 border border-rule bg-white">
+            <div
+              className="mt-10 overflow-hidden"
+              style={{ height: "min(80vh, 720px)" }}
+            >
               <iframe
                 src={paper.embed}
                 title={`Animated abstract — ${paper.title}`}
                 loading="lazy"
-                className="block w-full aspect-square sm:aspect-[4/3] lg:aspect-[16/10]"
-                style={{ minHeight: "70vh" }}
+                scrolling="no"
+                className="block w-full border-0"
+                style={{
+                  height: `calc(100% + ${paper.cropBottom ?? 0}px)`,
+                  background: "#f6f3ec",
+                }}
               />
-              <figcaption className="border-t border-rule px-4 py-2 text-xs text-muted">
-                Animated abstract — {paper.title}
-              </figcaption>
-            </figure>
+            </div>
           ) : null}
         </article>
       ))}

@@ -13,7 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 
 <style>
-  html, body { margin: 0; padding: 0; background: #F5F1E8; }
+  html, body { margin: 0; padding: 0; background: #f6f3ec; }
   body { font-family: Inter, system-ui, sans-serif; color: #14110D; }
   *, *::before, *::after { box-sizing: border-box; }
   text { dominant-baseline: alphabetic; }
@@ -125,7 +125,7 @@ function Sprite({ start = 0, end = Infinity, children, keepMounted = false }) {
 
 function Stage({
   width = 1280, height = 720, duration = 10,
-  background = '#f6f4ef', shellBackground = '#0a0a0a',
+  background = '#f6f3ec', shellBackground = '#0a0a0a',
   barTheme = 'dark', fps = 60, loop = true, autoplay = true,
   persistKey = 'animstage', belowCanvas = null, children,
 }) {
@@ -287,7 +287,7 @@ function PlaybackBar({ time, duration, playing, onPlayPause, onReset, onSeek, on
       border: light ? '1px solid rgba(20,17,13,0.10)' : '1px solid rgba(255,255,255,0.08)',
       width: '100%', maxWidth: 680, alignSelf: 'center', marginBottom: 12,
       borderRadius: 8,
-      color: light ? '#14110D' : '#f6f4ef',
+      color: light ? '#14110D' : '#f6f3ec',
       fontFamily: 'Inter, system-ui, sans-serif',
       userSelect: 'none', flexShrink: 0,
     }}>
@@ -311,7 +311,7 @@ function PlaybackBar({ time, duration, playing, onPlayPause, onReset, onSeek, on
 
       <div style={{
         fontFamily: mono, fontSize: 12, fontVariantNumeric: 'tabular-nums',
-        width: 64, textAlign: 'right', color: light ? '#14110D' : '#f6f4ef',
+        width: 64, textAlign: 'right', color: light ? '#14110D' : '#f6f3ec',
       }}>{fmt(time)}</div>
 
       <div ref={trackRef}
@@ -349,7 +349,7 @@ function IconButton({ children, onClick, title, light = false }) {
           ? (hover ? 'rgba(20,17,13,0.08)' : 'rgba(20,17,13,0.02)')
           : (hover ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.04)'),
         border: light ? '1px solid rgba(20,17,13,0.10)' : '1px solid rgba(255,255,255,0.1)',
-        borderRadius: 6, color: light ? '#14110D' : '#f6f4ef',
+        borderRadius: 6, color: light ? '#14110D' : '#f6f3ec',
         cursor: 'pointer', padding: 0, transition: 'background 120ms',
       }}>
       {children}
@@ -369,7 +369,7 @@ Object.assign(window, {
      scenes.jsx — Physics-as-measurement explainer scenes & app
      ════════════════════════════════════════════════════════════════════ -->
 <script type="text/babel" data-presets="react">
-const PAPER_BG  = '#F5F1E8';
+const PAPER_BG  = '#f6f3ec';
 const INK       = '#14110D';
 const INK2      = '#2A2620';
 const INK_DIM   = 'rgba(20,17,13,0.55)';
