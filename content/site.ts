@@ -5,8 +5,9 @@ export const site = {
   tagline:
     "Teaching equations to admit what they do not know, and building probabilistic models for the physics they leave out.",
   about: [
-    "I'm a researcher exploring the boundary between data-driven and physics-based modeling. My work focuses on identifying and correcting the structural gaps that classical models carry — the assumptions baked in long before the data arrives.",
-    "Recent work treats model-form error as a latent force: something inferable, separable, and useful, rather than noise to be smoothed over.",
+    "I work at the intersection of physics-based modeling, probabilistic inference, and data-driven learning for dynamical systems.",
+    "My research focuses on understanding what governing equations fail to capture — treating model-form errors not as residual noise, but as latent physical effects that can be inferred, learned, and used for prediction.",
+    "Through Gaussian processes, Bayesian filtering, and probabilistic digital twins, I develop frameworks that combine imperfect physics with noisy measurements to enable robust state estimation and uncertainty-aware predictions.",
   ],
   email: "sahilkashyap.nr@gmail.com",
   avatar: "/sahil.jpg",
