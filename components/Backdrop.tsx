@@ -10,34 +10,31 @@ type Motif = {
 };
 
 const motifs: Motif[] = [
-  { top: "8%", left: "5%", variant: "bell", size: 72, anim: "drift-a", opacity: 0.55 },
-  { top: "14%", right: "7%", variant: "ellipse", size: 80, anim: "drift-b", opacity: 0.5 },
-  { top: "22%", left: "84%", variant: "label", label: "x̂ₖ|ₖ", anim: "pulse", opacity: 0.7 },
-  { top: "30%", left: "3%", variant: "scatter", size: 78, anim: "drift-c", opacity: 0.6 },
-  { top: "38%", right: "4%", variant: "trajectory", size: 96, anim: "drift-a", opacity: 0.5 },
-  { top: "46%", left: "7%", variant: "tick", size: 40, anim: "pulse", opacity: 0.65 },
-  { top: "53%", right: "10%", variant: "bell", size: 64, anim: "drift-b", opacity: 0.55 },
-  { top: "61%", left: "80%", variant: "label", label: "𝒩(μ, σ²)", anim: "drift-c", opacity: 0.65 },
-  { top: "68%", left: "4%", variant: "ellipse", size: 72, anim: "spin", opacity: 0.5 },
-  { top: "76%", right: "6%", variant: "scatter", size: 66, anim: "drift-a", opacity: 0.6 },
-  { top: "84%", left: "72%", variant: "tick", size: 36, anim: "pulse", opacity: 0.6 },
-  { top: "90%", left: "8%", variant: "bell", size: 66, anim: "drift-b", opacity: 0.55 },
-  { top: "95%", right: "18%", variant: "label", label: "P⁻", anim: "pulse", opacity: 0.7 },
+  { top: "8%", left: "6%", variant: "bell", size: 56, anim: "drift-a", opacity: 0.18 },
+  { top: "14%", right: "9%", variant: "ellipse", size: 64, anim: "drift-b", opacity: 0.16 },
+  { top: "22%", left: "82%", variant: "label", label: "x̂ₖ|ₖ", anim: "pulse", opacity: 0.22 },
+  { top: "30%", left: "4%", variant: "scatter", size: 60, anim: "drift-c", opacity: 0.22 },
+  { top: "38%", right: "5%", variant: "trajectory", size: 80, anim: "drift-a", opacity: 0.14 },
+  { top: "48%", left: "8%", variant: "tick", size: 30, anim: "pulse", opacity: 0.24 },
+  { top: "54%", right: "12%", variant: "bell", size: 48, anim: "drift-b", opacity: 0.16 },
+  { top: "62%", left: "78%", variant: "label", label: "𝒩(μ, σ²)", anim: "drift-c", opacity: 0.18 },
+  { top: "70%", left: "5%", variant: "ellipse", size: 56, anim: "spin", opacity: 0.14 },
+  { top: "78%", right: "8%", variant: "scatter", size: 50, anim: "drift-a", opacity: 0.2 },
+  { top: "86%", left: "70%", variant: "tick", size: 26, anim: "pulse", opacity: 0.22 },
+  { top: "92%", left: "10%", variant: "bell", size: 52, anim: "drift-b", opacity: 0.16 },
+  { top: "96%", right: "20%", variant: "label", label: "P⁻", anim: "pulse", opacity: 0.2 },
 ];
 
 function Glyph({ variant, size = 48, label }: Pick<Motif, "variant" | "size" | "label">) {
-  const stroke = "#16161a";
-
   if (variant === "label") {
     return (
       <span
         style={{
           fontFamily: "ui-serif, Georgia, serif",
           fontStyle: "italic",
-          fontSize: 18,
-          color: stroke,
+          fontSize: 14,
+          color: "#16161a",
           whiteSpace: "nowrap",
-          letterSpacing: "0.01em",
         }}
       >
         {label}
@@ -46,40 +43,41 @@ function Glyph({ variant, size = 48, label }: Pick<Motif, "variant" | "size" | "
   }
   if (variant === "bell") {
     return (
-      <svg width={size} height={size * 0.55} viewBox="0 0 100 55" fill="none">
+      <svg width={size} height={size * 0.5} viewBox="0 0 100 50" fill="none">
         <path
-          d="M2,50 C 20,50 30,50 40,32 C 47,18 50,4 50,4 C 50,4 53,18 60,32 C 70,50 80,50 98,50"
-          stroke={stroke}
-          strokeWidth="1.6"
+          d="M2,46 C 20,46 30,46 40,30 C 47,18 50,4 50,4 C 50,4 53,18 60,30 C 70,46 80,46 98,46"
+          stroke="#16161a"
+          strokeWidth="1"
         />
-        <line x1="50" y1="4" x2="50" y2="50" stroke={stroke} strokeWidth="1" strokeDasharray="3 3" />
+        <line x1="50" y1="4" x2="50" y2="46" stroke="#16161a" strokeWidth="0.6" strokeDasharray="2 2" />
       </svg>
     );
   }
   if (variant === "ellipse") {
     return (
       <svg width={size} height={size * 0.6} viewBox="0 0 100 60" fill="none">
-        <ellipse cx="50" cy="30" rx="46" ry="24" stroke={stroke} strokeWidth="1.4" />
-        <ellipse cx="50" cy="30" rx="28" ry="14" stroke={stroke} strokeWidth="1.2" />
-        <circle cx="50" cy="30" r="2.2" fill={stroke} />
+        <ellipse cx="50" cy="30" rx="46" ry="24" stroke="#16161a" strokeWidth="1" />
+        <ellipse cx="50" cy="30" rx="28" ry="14" stroke="#16161a" strokeWidth="0.8" />
+        <circle cx="50" cy="30" r="1.4" fill="#16161a" />
       </svg>
     );
   }
   if (variant === "scatter") {
     return (
-      <svg width={size} height={size * 0.5} viewBox="0 0 100 50" fill={stroke}>
-        <circle cx="8" cy="30" r="2" />
-        <circle cx="22" cy="18" r="2" />
-        <circle cx="36" cy="26" r="2" />
-        <circle cx="50" cy="14" r="2" />
-        <circle cx="64" cy="22" r="2" />
-        <circle cx="78" cy="12" r="2" />
-        <circle cx="92" cy="20" r="2" />
+      <svg width={size} height={size * 0.5} viewBox="0 0 100 50" fill="#16161a">
+        <circle cx="8" cy="30" r="1.4" />
+        <circle cx="22" cy="18" r="1.4" />
+        <circle cx="36" cy="26" r="1.4" />
+        <circle cx="50" cy="14" r="1.4" />
+        <circle cx="64" cy="22" r="1.4" />
+        <circle cx="78" cy="12" r="1.4" />
+        <circle cx="92" cy="20" r="1.4" />
         <path
           d="M8,30 C 22,22 36,24 50,16 C 64,12 78,14 92,18"
           fill="none"
-          stroke={stroke}
-          strokeWidth="1.2"
+          stroke="#16161a"
+          strokeWidth="0.8"
+          strokeOpacity="0.6"
         />
       </svg>
     );
@@ -87,10 +85,10 @@ function Glyph({ variant, size = 48, label }: Pick<Motif, "variant" | "size" | "
   if (variant === "tick") {
     return (
       <svg width={size} height={size * 0.8} viewBox="0 0 30 24" fill="none">
-        <line x1="2" y1="12" x2="28" y2="12" stroke={stroke} strokeWidth="1.2" />
-        <line x1="6" y1="5" x2="6" y2="19" stroke={stroke} strokeWidth="1.6" />
-        <line x1="15" y1="2" x2="15" y2="22" stroke={stroke} strokeWidth="1.6" />
-        <line x1="24" y1="7" x2="24" y2="17" stroke={stroke} strokeWidth="1.6" />
+        <line x1="2" y1="12" x2="28" y2="12" stroke="#16161a" strokeWidth="0.8" />
+        <line x1="6" y1="6" x2="6" y2="18" stroke="#16161a" strokeWidth="1" />
+        <line x1="15" y1="3" x2="15" y2="21" stroke="#16161a" strokeWidth="1" />
+        <line x1="24" y1="8" x2="24" y2="16" stroke="#16161a" strokeWidth="1" />
       </svg>
     );
   }
@@ -99,15 +97,15 @@ function Glyph({ variant, size = 48, label }: Pick<Motif, "variant" | "size" | "
     <svg width={size} height={size * 0.5} viewBox="0 0 100 50" fill="none">
       <path
         d="M2,40 C 20,32 35,42 50,28 C 65,16 80,30 98,18"
-        stroke={stroke}
-        strokeWidth="1.4"
-        strokeDasharray="3 3"
-        opacity="0.7"
+        stroke="#16161a"
+        strokeWidth="1"
+        strokeDasharray="2 3"
       />
       <path
         d="M2,40 C 20,32 35,42 50,28 C 65,16 80,30 98,18"
-        stroke={stroke}
-        strokeWidth="1.4"
+        stroke="#16161a"
+        strokeWidth="1"
+        strokeOpacity="0.5"
       />
     </svg>
   );
@@ -127,7 +125,7 @@ export function Backdrop() {
             top: m.top,
             left: m.left,
             right: m.right,
-            opacity: m.opacity ?? 0.5,
+            opacity: m.opacity ?? 0.18,
             animationDelay: `${(i % 5) * -1.7}s`,
           }}
         >
@@ -140,25 +138,25 @@ export function Backdrop() {
 
         @keyframes backdrop-drift-a {
           0%, 100% { transform: translate(0, 0) rotate(0deg); }
-          50%      { transform: translate(3px, -5px) rotate(0.8deg); }
+          50%      { transform: translate(2px, -4px) rotate(0.6deg); }
         }
         @keyframes backdrop-drift-b {
           0%, 100% { transform: translate(0, 0) rotate(0deg); }
-          50%      { transform: translate(-4px, 4px) rotate(-1deg); }
+          50%      { transform: translate(-3px, 3px) rotate(-0.8deg); }
         }
         @keyframes backdrop-drift-c {
           0%, 100% { transform: translate(0, 0); }
-          33%      { transform: translate(3px, 3px); }
-          66%      { transform: translate(-3px, -2px); }
+          33%      { transform: translate(2px, 2px); }
+          66%      { transform: translate(-2px, -1px); }
         }
         @keyframes backdrop-pulse {
-          0%, 100% { transform: scale(1); }
-          50%      { transform: scale(1.08); }
+          0%, 100% { transform: scale(1); opacity: var(--op, 0.2); }
+          50%      { transform: scale(1.06); opacity: calc(var(--op, 0.2) * 1.4); }
         }
         @keyframes backdrop-spin {
-          0%   { transform: rotate(-3deg); }
-          50%  { transform: rotate(3deg); }
-          100% { transform: rotate(-3deg); }
+          0%   { transform: rotate(-2deg); }
+          50%  { transform: rotate(2deg); }
+          100% { transform: rotate(-2deg); }
         }
 
         .backdrop-drift-a { animation: backdrop-drift-a 9s ease-in-out infinite; }
