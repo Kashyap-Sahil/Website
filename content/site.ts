@@ -1,7 +1,7 @@
 export const site = {
   name: "Sahil Kashyap",
-  role: "Researcher",
-  location: "Delhi, India",
+  role: "PhD Scholar, IIT Delhi",
+  location: "India",
   tagline:
     "Teaching equations to admit what they do not know, and building probabilistic models for the physics they leave out.",
   about: [
