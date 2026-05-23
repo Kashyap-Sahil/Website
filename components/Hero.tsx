@@ -3,20 +3,20 @@ import { site } from "@/content/site";
 
 export function Hero() {
   return (
-    <section className="relative mx-auto max-w-5xl px-6 pt-20 pb-28 sm:px-10 sm:pt-28 sm:pb-36">
-      <iframe
-        src="/hero-animation.html"
-        title=""
-        aria-hidden
-        tabIndex={-1}
-        scrolling="no"
-        className="pointer-events-none absolute inset-0 -z-0 block h-full w-full border-0"
-        style={{
-          background: "#f6f3ec",
-          opacity: 0.85,
-        }}
-      />
-      <div className="relative z-10">
+    <section className="relative overflow-hidden pt-20 pb-28 sm:pt-28 sm:pb-36">
+      <div className="pointer-events-none absolute inset-y-0 left-1/2 -z-0 w-screen -translate-x-1/2">
+        <iframe
+          src="/hero-animation.html"
+          title=""
+          aria-hidden
+          tabIndex={-1}
+          scrolling="no"
+          className="block h-full w-full border-0"
+          style={{ background: "#f6f3ec" }}
+        />
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-5xl px-6 sm:px-10">
         <div className="flex items-center gap-6 mb-10 intro intro-delay-1">
           <Image
             src={site.avatar}
