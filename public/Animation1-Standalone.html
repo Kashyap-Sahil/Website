@@ -1,0 +1,1462 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Animation 1 — Model-form errors as latent forces</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- KaTeX for typeset math -->
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+        crossorigin="anonymous">
+  <script defer
+          src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+          crossorigin="anonymous"></script>
+
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400;1,8..60,500&display=swap">
+
+  <style>
+    :root {
+      --paper: #F6F3EC;
+      --ink: #111;
+      --ink-soft: #3a3a3a;
+      --faint: rgba(17, 17, 17, 0.55);
+      --rule: rgba(17, 17, 17, 0.14);
+      --accent: #C97B2A;
+      --error: #A23A2E;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: #F6F3EC;
+      color: var(--ink);
+      font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    main {
+      width: 100%;
+      max-width: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      background: #F6F3EC;
+    }
+
+    .card {
+      width: 100%;
+      max-width: none;
+      background: #F6F3EC;
+      align-self: stretch;
+      overflow: hidden;
+    }
+
+    .canvas-host {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 960 / 540;
+      background: #F6F3EC;
+    }
+
+    .katex { font-size: 1em; }
+    .katex-display { margin: 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="card" aria-label="Animation 1 — GPLFM latent-force inference">
+      <div class="canvas-host">
+        <div id="root" style="position:absolute; inset:0;"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- React 18 -->
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"
+          crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"
+          crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"
+          crossorigin="anonymous"></script>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       PHYSICS (inlined from physics.js)
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <script>
+(function () {
+  const N = 5;
+  const T = 18;
+  const dt = 0.004;
+  const NT = Math.round(T / dt) + 1;
+
+  const m = 1;
+  const kSpring = 220;
+  const cDamp = 0.18;
+  const ALPHA = 6.0e4;
+  const Ag = 0.18;
+
+  const K = Array.from({ length: N }, () => new Array(N).fill(0));
+  const ks = new Array(N).fill(kSpring);
+  for (let i = 0; i < N; i++) {
+    K[i][i] += ks[i];
+    if (i < N - 1) {
+      K[i][i]     += ks[i + 1];
+      K[i][i + 1] -= ks[i + 1];
+      K[i + 1][i] -= ks[i + 1];
+    }
+  }
+
+  function aGround(t) {
+    const env = Math.pow(Math.sin(Math.PI * t / T), 2);
+    const c1  = Math.sin(2 * Math.PI * 0.55 * t + 0.2);
+    const c2  = 0.55 * Math.sin(2 * Math.PI * 0.22 * t + 1.1);
+    const c3  = 0.25 * Math.sin(2 * Math.PI * 0.95 * t + 2.4);
+    return Ag * env * (c1 + c2 + c3);
+  }
+
+  const A_diag = m / (dt * dt) + (cDamp * m) / (2 * dt);
+  const B_diag = m / (dt * dt) - (cDamp * m) / (2 * dt);
+  const twoMdt2 = 2 * m / (dt * dt);
+
+  function integrate(nonlinear) {
+    const q = Array.from({ length: NT }, () => new Float64Array(N));
+    const ag = new Float64Array(NT);
+    for (let n = 1; n < NT - 1; n++) {
+      const tn = n * dt;
+      ag[n] = aGround(tn);
+      const F = -m * ag[n];
+      const qn = q[n];
+      const qm = q[n - 1];
+      for (let i = 0; i < N; i++) {
+        let Kq = K[i][i] * qn[i];
+        if (i > 0)     Kq += K[i][i - 1] * qn[i - 1];
+        if (i < N - 1) Kq += K[i][i + 1] * qn[i + 1];
+        let nl = 0;
+        if (nonlinear && i === 2) {
+          nl = ALPHA * qn[2] * qn[2] * qn[2];
+        }
+        q[n + 1][i] = (F - Kq - nl + twoMdt2 * qn[i] - B_diag * qm[i]) / A_diag;
+      }
+    }
+    ag[NT - 1] = aGround((NT - 1) * dt);
+    return { q, ag };
+  }
+
+  const sim_lin  = integrate(false);
+  const sim_true = integrate(true);
+
+  function derivatives(q) {
+    const v = Array.from({ length: NT }, () => new Float64Array(N));
+    const a = Array.from({ length: NT }, () => new Float64Array(N));
+    for (let n = 1; n < NT - 1; n++) {
+      for (let i = 0; i < N; i++) {
+        v[n][i] = (q[n + 1][i] - q[n - 1][i]) / (2 * dt);
+        a[n][i] = (q[n + 1][i] - 2 * q[n][i] + q[n - 1][i]) / (dt * dt);
+      }
+    }
+    return { v, a };
+  }
+  const lin_d  = derivatives(sim_lin.q);
+  const true_d = derivatives(sim_true.q);
+
+  const lambda_true = Array.from({ length: NT }, () => new Float64Array(N));
+  for (let n = 0; n < NT; n++) {
+    const qn2 = sim_true.q[n][2];
+    lambda_true[n][2] = ALPHA * qn2 * qn2 * qn2;
+  }
+
+  function rngPair(seed) {
+    let s = seed;
+    return () => {
+      s = (s * 9301 + 49297) % 233280;
+      return s / 233280;
+    };
+  }
+  const rng = rngPair(7);
+
+  let lamPeak = 1e-30;
+  for (let n = 0; n < NT; n++) {
+    for (let i = 0; i < N; i++) {
+      const v = Math.abs(lambda_true[n][i]);
+      if (v > lamPeak) lamPeak = v;
+    }
+  }
+  const LAM_VIS = 0.95 / lamPeak;
+  const lambda_norm = Array.from({ length: NT }, () => new Float64Array(N));
+  for (let n = 0; n < NT; n++) {
+    for (let i = 0; i < N; i++) {
+      lambda_norm[n][i] = lambda_true[n][i] * LAM_VIS;
+    }
+  }
+
+  const noise = Array.from({ length: N }, () => new Float64Array(NT));
+  for (let i = 0; i < N; i++) {
+    let prev = 0;
+    const lp = 0.05;
+    for (let n = 0; n < NT; n++) {
+      const w = (rng() - 0.5) * 2;
+      prev = prev + lp * (w - prev);
+      noise[i][n] = prev;
+    }
+  }
+
+  const sigmaInferred = [0.18, 0.18, 0.28, 0.16, 0.18];
+  const lambda_inf  = Array.from({ length: NT }, () => new Float64Array(N));
+  const lambda_band = Array.from({ length: NT }, () => new Float64Array(N));
+  for (let n = 0; n < NT; n++) {
+    for (let i = 0; i < N; i++) {
+      lambda_inf[n][i]  = lambda_norm[n][i] + sigmaInferred[i] * noise[i][n];
+      lambda_band[n][i] = sigmaInferred[i] * 1.96;
+    }
+  }
+
+  const sparsity_pre  = [0.62, 0.70, 0.78, 0.66, 0.60];
+  const sparsity_post = [0.05, 0.10, 0.92, 0.06, 0.05];
+
+  const residual = Array.from({ length: NT }, () => new Float64Array(N));
+  for (let n = 0; n < NT; n++) {
+    for (let i = 0; i < N; i++) {
+      residual[n][i] = sim_true.q[n][i] - sim_lin.q[n][i];
+    }
+  }
+
+  function sample(arr2d, t) {
+    const f = Math.max(0, Math.min(T - 1e-9, t)) / dt;
+    const i0 = Math.floor(f);
+    const i1 = Math.min(NT - 1, i0 + 1);
+    const u = f - i0;
+    const a = arr2d[i0];
+    const b = arr2d[i1];
+    const out = new Float64Array(N);
+    for (let k = 0; k < N; k++) out[k] = a[k] * (1 - u) + b[k] * u;
+    return out;
+  }
+  function sample1(arr1d, t) {
+    const f = Math.max(0, Math.min(T - 1e-9, t)) / dt;
+    const i0 = Math.floor(f);
+    const i1 = Math.min(NT - 1, i0 + 1);
+    const u = f - i0;
+    return arr1d[i0] * (1 - u) + arr1d[i1] * u;
+  }
+
+  window.PHYSICS = {
+    N, T, dt, NT,
+    aGround,
+    q_lin:  sim_lin.q,
+    q_true: sim_true.q,
+    ag:     sim_true.ag,
+    v_lin:  lin_d.v,
+    v_true: true_d.v,
+    a_lin:  lin_d.a,
+    a_true: true_d.a,
+    residual,
+    lambda_true,
+    lambda_inf,
+    lambda_band,
+    sigmaInferred,
+    sparsity_pre,
+    sparsity_post,
+    sample, sample1,
+  };
+})();
+  </script>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       ALL JSX (animations + frame + panels + scenes) — inlined
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <script type="text/babel">
+// ═══════════════════════════════════════════════════════════════════════════
+// animations.jsx — Stage, Timeline, Sprite, easing helpers
+// ═══════════════════════════════════════════════════════════════════════════
+
+const Easing = {
+  linear: (t) => t,
+  easeInQuad:    (t) => t * t,
+  easeOutQuad:   (t) => t * (2 - t),
+  easeInOutQuad: (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t),
+  easeInCubic:    (t) => t * t * t,
+  easeOutCubic:   (t) => (--t) * t * t + 1,
+  easeInOutCubic: (t) => (t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1),
+  easeInQuart:    (t) => t * t * t * t,
+  easeOutQuart:   (t) => 1 - (--t) * t * t * t,
+  easeInOutQuart: (t) => (t < 0.5 ? 8 * t * t * t * t : 1 - 8 * (--t) * t * t * t),
+  easeInExpo:  (t) => (t === 0 ? 0 : Math.pow(2, 10 * (t - 1))),
+  easeOutExpo: (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t)),
+  easeInOutExpo: (t) => {
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    if (t < 0.5) return 0.5 * Math.pow(2, 20 * t - 10);
+    return 1 - 0.5 * Math.pow(2, -20 * t + 10);
+  },
+  easeInSine:    (t) => 1 - Math.cos((t * Math.PI) / 2),
+  easeOutSine:   (t) => Math.sin((t * Math.PI) / 2),
+  easeInOutSine: (t) => -(Math.cos(Math.PI * t) - 1) / 2,
+  easeOutBack: (t) => {
+    const c1 = 1.70158, c3 = c1 + 1;
+    return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+  },
+  easeInBack: (t) => {
+    const c1 = 1.70158, c3 = c1 + 1;
+    return c3 * t * t * t - c1 * t * t;
+  },
+  easeInOutBack: (t) => {
+    const c1 = 1.70158, c2 = c1 * 1.525;
+    return t < 0.5
+      ? (Math.pow(2 * t, 2) * ((c2 + 1) * 2 * t - c2)) / 2
+      : (Math.pow(2 * t - 2, 2) * ((c2 + 1) * (t * 2 - 2) + c2) + 2) / 2;
+  },
+  easeOutElastic: (t) => {
+    const c4 = (2 * Math.PI) / 3;
+    if (t === 0) return 0;
+    if (t === 1) return 1;
+    return Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+  },
+};
+
+const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+function interpolate(input, output, ease = Easing.linear) {
+  return (t) => {
+    if (t <= input[0]) return output[0];
+    if (t >= input[input.length - 1]) return output[output.length - 1];
+    for (let i = 0; i < input.length - 1; i++) {
+      if (t >= input[i] && t <= input[i + 1]) {
+        const span = input[i + 1] - input[i];
+        const local = span === 0 ? 0 : (t - input[i]) / span;
+        const easeFn = Array.isArray(ease) ? (ease[i] || Easing.linear) : ease;
+        const eased = easeFn(local);
+        return output[i] + (output[i + 1] - output[i]) * eased;
+      }
+    }
+    return output[output.length - 1];
+  };
+}
+
+function animate({ from = 0, to = 1, start = 0, end = 1, ease = Easing.easeInOutCubic }) {
+  return (t) => {
+    if (t <= start) return from;
+    if (t >= end) return to;
+    const local = (t - start) / (end - start);
+    return from + (to - from) * ease(local);
+  };
+}
+
+const TimelineContext = React.createContext({ time: 0, duration: 10, playing: false });
+const useTime = () => React.useContext(TimelineContext).time;
+const useTimeline = () => React.useContext(TimelineContext);
+
+const SpriteContext = React.createContext({ localTime: 0, progress: 0, duration: 0 });
+const useSprite = () => React.useContext(SpriteContext);
+
+function Sprite({ start = 0, end = Infinity, children, keepMounted = false }) {
+  const { time } = useTimeline();
+  const visible = time >= start && time <= end;
+  if (!visible && !keepMounted) return null;
+  const duration = end - start;
+  const localTime = Math.max(0, time - start);
+  const progress = duration > 0 && isFinite(duration)
+    ? clamp(localTime / duration, 0, 1)
+    : 0;
+  const value = { localTime, progress, duration, visible };
+  return (
+    <SpriteContext.Provider value={value}>
+      {typeof children === 'function' ? children(value) : children}
+    </SpriteContext.Provider>
+  );
+}
+
+function Stage({
+  width = 1280,
+  height = 720,
+  duration = 10,
+  background = '#F6F3EC',
+  fps = 60,
+  loop = true,
+  autoplay = true,
+  persistKey = 'animstage',
+  children,
+}) {
+  const [time, setTime] = React.useState(() => {
+    try {
+      const v = parseFloat(localStorage.getItem(persistKey + ':t') || '0');
+      return isFinite(v) ? clamp(v, 0, duration) : 0;
+    } catch { return 0; }
+  });
+  const [playing, setPlaying] = React.useState(autoplay);
+  const [hoverTime, setHoverTime] = React.useState(null);
+  const [scale, setScale] = React.useState(1);
+
+  const stageRef = React.useRef(null);
+  const canvasRef = React.useRef(null);
+  const rafRef = React.useRef(null);
+  const lastTsRef = React.useRef(null);
+
+  React.useEffect(() => {
+    try { localStorage.setItem(persistKey + ':t', String(time)); } catch {}
+  }, [time, persistKey]);
+
+  React.useEffect(() => {
+    if (!stageRef.current) return;
+    const el = stageRef.current;
+    const measure = () => {
+      const barH = 44;
+      const s = Math.min(
+        el.clientWidth / width,
+        (el.clientHeight - barH) / height
+      );
+      setScale(Math.max(0.05, s));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    window.addEventListener('resize', measure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [width, height]);
+
+  React.useEffect(() => {
+    if (!playing) {
+      lastTsRef.current = null;
+      return;
+    }
+    const step = (ts) => {
+      if (lastTsRef.current == null) lastTsRef.current = ts;
+      const dt = (ts - lastTsRef.current) / 1000;
+      lastTsRef.current = ts;
+      setTime((t) => {
+        let next = t + dt;
+        if (next >= duration) {
+          if (loop) next = next % duration;
+          else { next = duration; setPlaying(false); }
+        }
+        return next;
+      });
+      rafRef.current = requestAnimationFrame(step);
+    };
+    rafRef.current = requestAnimationFrame(step);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      lastTsRef.current = null;
+    };
+  }, [playing, duration, loop]);
+
+  React.useEffect(() => {
+    const onKey = (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setPlaying(p => !p);
+      } else if (e.code === 'ArrowLeft') {
+        setTime(t => clamp(t - (e.shiftKey ? 1 : 0.1), 0, duration));
+      } else if (e.code === 'ArrowRight') {
+        setTime(t => clamp(t + (e.shiftKey ? 1 : 0.1), 0, duration));
+      } else if (e.key === '0' || e.code === 'Home') {
+        setTime(0);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [duration]);
+
+  const displayTime = hoverTime != null ? hoverTime : time;
+
+  const ctxValue = React.useMemo(
+    () => ({ time: displayTime, duration, playing, setTime, setPlaying }),
+    [displayTime, duration, playing]
+  );
+
+  return (
+    <div
+      ref={stageRef}
+      style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center',
+        background: '#F6F3EC',
+        fontFamily: 'Inter, system-ui, sans-serif',
+      }}
+    >
+      <div style={{
+        flex: 1,
+        width: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden',
+        minHeight: 0,
+      }}>
+        <div
+          ref={canvasRef}
+          style={{
+            width, height,
+            background,
+            position: 'relative',
+            transform: `scale(${scale})`,
+            transformOrigin: 'center',
+            flexShrink: 0,
+            overflow: 'hidden',
+          }}
+        >
+          <TimelineContext.Provider value={ctxValue}>
+            {children}
+          </TimelineContext.Provider>
+        </div>
+      </div>
+      <PlaybackBar
+        time={displayTime}
+        actualTime={time}
+        duration={duration}
+        playing={playing}
+        onPlayPause={() => setPlaying(p => !p)}
+        onReset={() => { setTime(0); }}
+        onSeek={(t) => setTime(t)}
+        onHover={(t) => setHoverTime(t)}
+      />
+    </div>
+  );
+}
+
+function PlaybackBar({ time, duration, playing, onPlayPause, onReset, onSeek, onHover }) {
+  const trackRef = React.useRef(null);
+  const [dragging, setDragging] = React.useState(false);
+
+  const timeFromEvent = React.useCallback((e) => {
+    const rect = trackRef.current.getBoundingClientRect();
+    const x = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    return x * duration;
+  }, [duration]);
+
+  const onTrackMove = (e) => {
+    if (!trackRef.current) return;
+    const t = timeFromEvent(e);
+    if (dragging) { onSeek(t); } else { onHover(t); }
+  };
+  const onTrackLeave = () => { if (!dragging) onHover(null); };
+  const onTrackDown = (e) => {
+    setDragging(true);
+    const t = timeFromEvent(e);
+    onSeek(t);
+    onHover(null);
+  };
+
+  React.useEffect(() => {
+    if (!dragging) return;
+    const onUp = () => setDragging(false);
+    const onMove = (e) => {
+      if (!trackRef.current) return;
+      const t = timeFromEvent(e);
+      onSeek(t);
+    };
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('mousemove', onMove);
+    return () => {
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('mousemove', onMove);
+    };
+  }, [dragging, timeFromEvent, onSeek]);
+
+  const pct = duration > 0 ? (time / duration) * 100 : 0;
+  const fmt = (t) => {
+    const total = Math.max(0, t);
+    const m = Math.floor(total / 60);
+    const s = Math.floor(total % 60);
+    const cs = Math.floor((total * 100) % 100);
+    return `${String(m).padStart(1, '0')}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
+  };
+  const mono = 'JetBrains Mono, ui-monospace, SFMono-Regular, monospace';
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 12,
+      padding: '8px 16px',
+      background: '#F6F3EC',
+      borderTop: '1px solid rgba(17,17,17,0.10)',
+      width: '100%',
+      maxWidth: 680,
+      alignSelf: 'center',
+      borderRadius: 8,
+      color: '#111',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      userSelect: 'none',
+      flexShrink: 0,
+    }}>
+      <IconButton onClick={onReset} title="Return to start (0)">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M3 2v10M12 2L5 7l7 5V2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"/>
+        </svg>
+      </IconButton>
+      <IconButton onClick={onPlayPause} title="Play/pause (space)">
+        {playing ? (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="3" y="2" width="3" height="10" fill="currentColor"/>
+            <rect x="8" y="2" width="3" height="10" fill="currentColor"/>
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M3 2l9 5-9 5V2z" fill="currentColor"/>
+          </svg>
+        )}
+      </IconButton>
+      <div style={{
+        fontFamily: mono, fontSize: 12, fontVariantNumeric: 'tabular-nums',
+        width: 64, textAlign: 'right', color: '#111',
+      }}>
+        {fmt(time)}
+      </div>
+      <div
+        ref={trackRef}
+        onMouseMove={onTrackMove}
+        onMouseLeave={onTrackLeave}
+        onMouseDown={onTrackDown}
+        style={{
+          flex: 1, height: 22, position: 'relative', cursor: 'pointer',
+          display: 'flex', alignItems: 'center',
+        }}
+      >
+        <div style={{
+          position: 'absolute', left: 0, right: 0, height: 4,
+          background: 'rgba(17,17,17,0.12)', borderRadius: 2,
+        }}/>
+        <div style={{
+          position: 'absolute', left: 0, width: `${pct}%`, height: 4,
+          background: '#111', borderRadius: 2,
+        }}/>
+        <div style={{
+          position: 'absolute', left: `${pct}%`, top: '50%',
+          width: 12, height: 12, marginLeft: -6, marginTop: -6,
+          background: '#111', borderRadius: 6,
+          boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+        }}/>
+      </div>
+      <div style={{
+        fontFamily: mono, fontSize: 12, fontVariantNumeric: 'tabular-nums',
+        width: 64, textAlign: 'left', color: 'rgba(17,17,17,0.55)',
+      }}>
+        {fmt(duration)}
+      </div>
+    </div>
+  );
+}
+
+function IconButton({ children, onClick, title }) {
+  const [hover, setHover] = React.useState(false);
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        width: 28, height: 28,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: hover ? 'rgba(17,17,17,0.08)' : 'rgba(17,17,17,0.03)',
+        border: '1px solid rgba(17,17,17,0.15)',
+        borderRadius: 6,
+        color: '#111',
+        cursor: 'pointer',
+        padding: 0,
+        transition: 'background 120ms',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+Object.assign(window, {
+  Easing, interpolate, animate, clamp,
+  TimelineContext, useTime, useTimeline,
+  Sprite, SpriteContext, useSprite,
+  Stage, PlaybackBar,
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// frame.jsx — 5-storey shear-frame diagram
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function () {
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const INK = '#111';
+  const INK_SOFT = '#262626';
+  const PAPER = '#F6F3EC';
+  const ACCENT = '#C8362B';
+  const GHOST_BLUE = '#2B5BA8';
+  const ERROR = '#A23A2E';
+  const GRID = 'rgba(17,17,17,0.10)';
+
+  const DISP_SCALE = 5.5e2;
+  const RESID_SCALE = 2.0e5;
+
+  function springPath(x, y1, y2, width, coils = 6, kinked = false, kinkBias = 0) {
+    const h = y2 - y1;
+    const seg = h / (coils * 2);
+    const pts = [];
+    pts.push([x, y1]);
+    pts.push([x, y1 + seg * 0.4]);
+    for (let i = 0; i < coils * 2; i++) {
+      const yy = y1 + seg * 0.4 + (i + 1) * (h - seg * 0.8) / (coils * 2);
+      let dx = (i % 2 === 0 ? -1 : 1) * width / 2;
+      if (kinked) {
+        const mid = coils * 2 / 2;
+        const dist = Math.abs(i - mid + 0.5);
+        const bulge = Math.max(0, 1 - dist / 1.4);
+        dx *= (1 + bulge * (0.9 + 0.4 * kinkBias));
+      }
+      pts.push([x + dx, yy]);
+    }
+    pts.push([x, y2]);
+    return pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ');
+  }
+
+  function Dashpot({ xTop, yTop, xBot, yBot, w = 9, cupH = 11 }) {
+    const cupTopY  = yTop + 1;
+    const cupBotY  = cupTopY + cupH;
+    const pistonY  = cupTopY + cupH * 0.55;
+    return (
+      <g stroke={INK_SOFT} strokeWidth={1.1} fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <line x1={xTop - w / 2} y1={cupTopY} x2={xTop + w / 2} y2={cupTopY} />
+        <path d={`M ${xTop - w / 2} ${cupTopY} L ${xTop - w / 2} ${cupBotY} L ${xTop + w / 2} ${cupBotY} L ${xTop + w / 2} ${cupTopY}`} />
+        <line x1={xTop - w * 0.42} y1={pistonY} x2={xTop + w * 0.42} y2={pistonY} strokeWidth={1.4} />
+        <line x1={xTop} y1={pistonY} x2={xTop} y2={cupBotY} />
+        <line x1={xTop} y1={cupBotY} x2={xBot} y2={yBot} />
+      </g>
+    );
+  }
+
+  function MassBlock({ x, y, w, h, label, ghost = false }) {
+    const opacity = ghost ? 0.28 : 1;
+    return (
+      <g opacity={opacity}>
+        <rect
+          x={x - w / 2} y={y - h / 2}
+          width={w} height={h}
+          fill={ghost ? 'none' : PAPER}
+          stroke={ghost ? GHOST_BLUE : INK}
+          strokeWidth={ghost ? 1 : 1.4}
+          strokeDasharray={ghost ? '3 3' : undefined}
+        />
+        {!ghost && label && (
+          <text x={x} y={y + 5}
+            fontFamily="'Source Serif 4', 'Source Serif Pro', Georgia, serif"
+            fontSize={13} fill={INK_SOFT} textAnchor="middle"
+            fontStyle="italic">
+            {label}
+          </text>
+        )}
+      </g>
+    );
+  }
+
+  function slantedSpringPath(x1, y1, x2, y2, coils = 6, kinked = false, kinkAmp = 0) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const px = -uy, py = ux;
+    const ampBase = 6.5;
+    const segs = coils * 2;
+    const leadIn = len * 0.08;
+    const inner = len - 2 * leadIn;
+    const pts = [];
+    pts.push([x1, y1]);
+    pts.push([x1 + ux * leadIn, y1 + uy * leadIn]);
+    for (let i = 0; i < segs; i++) {
+      const t = (i + 1) / segs;
+      const cx = x1 + ux * (leadIn + inner * t);
+      const cy = y1 + uy * (leadIn + inner * t);
+      let amp = ampBase * (i % 2 === 0 ? -1 : 1);
+      if (kinked) {
+        const mid = segs / 2;
+        const dist = Math.abs(i - mid + 0.5);
+        const bulge = Math.max(0, 1 - dist / 1.5);
+        amp *= 1 + bulge * (0.55 + 0.7 * kinkAmp);
+      }
+      pts.push([cx + px * amp, cy + py * amp]);
+    }
+    pts.push([x2 - ux * leadIn, y2 - uy * leadIn]);
+    pts.push([x2, y2]);
+    return pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ');
+  }
+
+  function FrameInstance({ xCenter, yGround, storeyH, massH, massW, qVec, baseShift, ghost }) {
+    const N = 5;
+    const cy = (i) => yGround - (i + 1) * storeyH + massH / 2;
+    const els = [];
+
+    if (!ghost) {
+      els.push(
+        <g key="g">
+          <line x1={xCenter - 110} y1={yGround} x2={xCenter + 110} y2={yGround} stroke={INK} strokeWidth={1.4} />
+          {Array.from({ length: 11 }).map((_, k) => {
+            const x0 = xCenter - 100 + k * 20;
+            return <line key={k} x1={x0} y1={yGround} x2={x0 - 6} y2={yGround + 7} stroke={INK_SOFT} strokeWidth={0.8} />;
+          })}
+        </g>
+      );
+    }
+
+    const SPR_DX = 36;
+    const DSH_DX = 36;
+    const NL_DX  = 4;
+
+    for (let i = 0; i < N; i++) {
+      const yTopAnchor = cy(i) + massH / 2;
+      const yBotAnchor = i === 0 ? yGround : cy(i - 1) - massH / 2;
+      const qi    = qVec[i] * DISP_SCALE;
+      const qBel  = (i === 0 ? baseShift : qVec[i - 1] * DISP_SCALE);
+
+      const xSprTop = xCenter - SPR_DX + qi;
+      const xSprBot = xCenter - SPR_DX + qBel;
+      const linPath = slantedSpringPath(xSprTop, yTopAnchor, xSprBot, yBotAnchor, 6, false, 0);
+      els.push(
+        <path key={`spr-${i}`} d={linPath}
+          stroke={ghost ? GHOST_BLUE : INK}
+          strokeWidth={1.2}
+          opacity={ghost ? 0.75 : 1}
+          strokeDasharray={ghost ? '3 3' : undefined}
+          fill="none"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      );
+
+      if (i === 2 && !ghost) {
+        const xNlTop = xCenter + NL_DX + qi;
+        const xNlBot = xCenter + NL_DX + qBel;
+        const nlPath = slantedSpringPath(xNlTop, yTopAnchor, xNlBot, yBotAnchor, 7, true, 1);
+        els.push(
+          <path key={`nl-${i}`} d={nlPath}
+            stroke={ACCENT}
+            strokeWidth={1.8}
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        );
+      }
+
+      if (!ghost) {
+        const xDshTop = xCenter + DSH_DX + qi;
+        const xDshBot = xCenter + DSH_DX + qBel;
+        els.push(
+          <Dashpot key={`dash-${i}`}
+            xTop={xDshTop} yTop={yTopAnchor}
+            xBot={xDshBot} yBot={yBotAnchor} />
+        );
+      }
+    }
+
+    for (let i = 0; i < N; i++) {
+      const qi = qVec[i] * DISP_SCALE;
+      els.push(
+        <MassBlock
+          key={`m-${i}`}
+          x={xCenter + qi} y={cy(i)}
+          w={massW} h={massH}
+          label={ghost ? null : `m${'₁₂₃₄₅'[i]}`}
+          ghost={ghost}
+        />
+      );
+    }
+
+    return <g>{els}</g>;
+  }
+
+  function ShearFrameDiagram({ x, y, w, h, showGhost = false }) {
+    const t = window.useTime();
+    const P = window.PHYSICS;
+    if (!P) return null;
+
+    const qT = P.sample(P.q_true, t);
+    const qL = P.sample(P.q_lin,  t);
+    const ag = P.sample1(P.ag, t);
+
+    const xCenter = x + w * 0.42;
+    const yGround = y + h - 26;
+    const storeyH = 50;
+    const massH   = 18;
+    const massW   = 96;
+    const baseShift = ag * 14;
+
+    return (
+      <g>
+        {[0, 1, 2, 3, 4].map((i) => {
+          const labelCy = yGround - (i + 1) * storeyH + massH / 2;
+          return (
+            <text key={`lab-${i}`}
+              x={x + 6} y={labelCy + 5}
+              fontFamily="'Source Serif 4', Georgia, serif"
+              fontSize={13} fill={INK} fontStyle="italic"
+              opacity={0.6}>
+              DOF {i + 1}
+            </text>
+          );
+        })}
+        <g transform={`translate(${baseShift}, 0)`}>
+          {showGhost && (
+            <FrameInstance
+              xCenter={xCenter} yGround={yGround}
+              storeyH={storeyH} massH={massH} massW={massW}
+              qVec={qL}
+              baseShift={0}
+              ghost={true}
+            />
+          )}
+          <FrameInstance
+            xCenter={xCenter} yGround={yGround}
+            storeyH={storeyH} massH={massH} massW={massW}
+            qVec={qT}
+            baseShift={0}
+            ghost={false}
+          />
+        </g>
+      </g>
+    );
+  }
+
+  window.ShearFrameDiagram = ShearFrameDiagram;
+  window.__FRAME_COLORS__ = { INK, INK_SOFT, PAPER, ACCENT, GHOST_BLUE, ERROR, GRID };
+})();
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// panels.jsx — λ panels + sparsity bar
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function () {
+  const INK = '#111';
+  const INK_SOFT = '#262626';
+  const FAINT = 'rgba(17,17,17,0.45)';
+  const ACCENT = '#C8362B';
+  const ACCENT_FILL = 'rgba(200,54,43,0.18)';
+  const ERROR = '#A23A2E';
+  const GRID = 'rgba(17,17,17,0.10)';
+
+  function buildTracePath(values, dtSample, panelW, panelH, lamMax, tauUpTo, T) {
+    const yMid = panelH / 2;
+    const yScale = (panelH * 0.42) / lamMax;
+    let d = '';
+    const N = values.length;
+    const step = Math.max(1, Math.round((T / dtSample) / (panelW)));
+    let started = false;
+    for (let i = 0; i < N; i += step) {
+      const t = i * dtSample;
+      if (t > tauUpTo) break;
+      const x = (t / T) * panelW;
+      const y = yMid - values[i] * yScale;
+      d += (started ? 'L' : 'M') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+      started = true;
+    }
+    return d;
+  }
+
+  function buildBandPath(values, sigma, dtSample, panelW, panelH, lamMax, tauUpTo, T) {
+    const yMid = panelH / 2;
+    const yScale = (panelH * 0.42) / lamMax;
+    const N = values.length;
+    const step = Math.max(1, Math.round((T / dtSample) / (panelW)));
+    const top = [], bot = [];
+    for (let i = 0; i < N; i += step) {
+      const t = i * dtSample;
+      if (t > tauUpTo) break;
+      const x = (t / T) * panelW;
+      const lo = values[i] - 1.96 * sigma;
+      const hi = values[i] + 1.96 * sigma;
+      top.push([x, yMid - hi * yScale]);
+      bot.push([x, yMid - lo * yScale]);
+    }
+    if (top.length < 2) return '';
+    let d = 'M ' + top[0][0].toFixed(1) + ',' + top[0][1].toFixed(1) + ' ';
+    for (let i = 1; i < top.length; i++) d += 'L ' + top[i][0].toFixed(1) + ',' + top[i][1].toFixed(1) + ' ';
+    for (let i = bot.length - 1; i >= 0; i--) d += 'L ' + bot[i][0].toFixed(1) + ',' + bot[i][1].toFixed(1) + ' ';
+    d += 'Z';
+    return d;
+  }
+
+  function LambdaPanel({
+    x, y, w, h, dof, label,
+    revealProgress, spawnProgress, highlight, sigmaScale, showSigma,
+  }) {
+    const P = window.PHYSICS;
+    const T = P.T;
+    const NT = P.NT;
+    const dtSample = P.dt;
+    const trace = new Float64Array(NT);
+    for (let i = 0; i < NT; i++) trace[i] = P.lambda_inf[i][dof];
+    const lamMax = 1.15;
+    const tauUpTo = revealProgress * T;
+    const sigma = window.PHYSICS && window.PHYSICS.sigmaInferred
+      ? window.PHYSICS.sigmaInferred[dof] * sigmaScale
+      : 0.18 * sigmaScale;
+    const trace_d = buildTracePath(trace, dtSample, w, h, lamMax, tauUpTo, T);
+    const band_d  = showSigma ? buildBandPath(trace, sigma, dtSample, w, h, lamMax, tauUpTo, T) : '';
+
+    return (
+      <g transform={`translate(${x}, ${y})`} opacity={spawnProgress}>
+        <rect x={0} y={0} width={w} height={h}
+          fill={highlight ? 'rgba(200,54,43,0.06)' : 'none'}
+          stroke={highlight ? ACCENT : INK_SOFT}
+          strokeWidth={highlight ? 1.2 : 0.6}
+        />
+        <line x1={0} y1={h / 2} x2={w} y2={h / 2}
+          stroke={INK} strokeWidth={0.5} opacity={0.5} />
+        <text x={8} y={14}
+          fontFamily="'Source Serif 4', Georgia, serif"
+          fontSize={12} fill={INK} fontStyle="italic">
+          {label}
+        </text>
+        {band_d && (
+          <path d={band_d} fill={ACCENT_FILL} stroke="none" />
+        )}
+        {trace_d && (
+          <path d={trace_d}
+            stroke={ACCENT} strokeWidth={1.4}
+            fill="none" strokeLinejoin="round" strokeLinecap="round"
+          />
+        )}
+        {revealProgress > 0 && revealProgress < 1 && (
+          <line x1={revealProgress * w} y1={0} x2={revealProgress * w} y2={h}
+            stroke={INK} strokeWidth={0.6} opacity={0.35} strokeDasharray="2 2" />
+        )}
+      </g>
+    );
+  }
+
+  function LambdaPanels({ x, y, w, h, gap = 4 }) {
+    const t = window.useTime();
+    const P = window.PHYSICS;
+    if (!P) return null;
+    const T = P.T;
+    const N = P.N;
+    const panelH = (h - gap * (N - 1)) / N;
+    const spawnStart = 6.0;
+    const sweepEnd = 10.0;
+    const sparsityStart = 10.0;
+    const sparsityEnd   = 14.0;
+
+    const panels = [];
+    for (let i = 0; i < N; i++) {
+      const dofIdx = N - 1 - i;
+      const py = y + i * (panelH + gap);
+      const myStart = spawnStart + i * 0.25;
+      const spawnT  = clamp((t - myStart) / 0.5, 0, 1);
+      const spawnProgress = Easing.easeOutCubic(spawnT);
+      const revealRaw = clamp((t - (myStart + 0.2)) / (sweepEnd - (myStart + 0.2)), 0, 1);
+      const revealProgress = Easing.linear(revealRaw);
+      const sparsityT = clamp((t - sparsityStart) / (sparsityEnd - sparsityStart), 0, 1);
+      const isActive = (dofIdx === 2);
+      const sigmaScale = isActive
+        ? 1.0
+        : (1 - Easing.easeInOutCubic(sparsityT) * 0.92);
+      const showSigma = true;
+      const highlight = isActive && t >= sparsityStart - 0.3;
+
+      panels.push(
+        <LambdaPanel
+          key={i}
+          x={x} y={py} w={w} h={panelH}
+          dof={dofIdx}
+          label={`η${'₁₂₃₄₅'[dofIdx]}(t)`}
+          revealProgress={revealProgress}
+          spawnProgress={spawnProgress}
+          highlight={highlight}
+          sigmaScale={sigmaScale}
+          showSigma={showSigma}
+        />
+      );
+    }
+
+    const headerOpacity = clamp((t - spawnStart) / 0.8, 0, 1);
+    return (
+      <g>
+        <g opacity={headerOpacity}>
+          <text x={x} y={y - 10}
+            fontFamily="'Source Serif 4', Georgia, serif"
+            fontSize={13} fill={INK} fontStyle="italic">
+            Inferred latent forces  ηᵢ(t)
+          </text>
+          <text x={x + w} y={y - 10}
+            fontFamily="Inter, system-ui, sans-serif"
+            fontSize={11} fill={FAINT} textAnchor="end" letterSpacing="0.04em">
+            posterior mean ± 1.96σ
+          </text>
+        </g>
+        {panels}
+        <g opacity={headerOpacity}>
+          <line x1={x} y1={y + h + 6} x2={x + w} y2={y + h + 6}
+            stroke={INK} strokeWidth={0.6} />
+          {[0, 6, 12, 18].map((tk) => {
+            const xt = x + (tk / T) * w;
+            return (
+              <g key={tk}>
+                <line x1={xt} y1={y + h + 6} x2={xt} y2={y + h + 10}
+                  stroke={INK} strokeWidth={0.6} />
+                <text x={xt} y={y + h + 22}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fontSize={11} fill={INK_SOFT} textAnchor="middle">
+                  {tk}s
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      </g>
+    );
+  }
+
+  function SparsityBar({ x, y, w, h, gap = 4 }) {
+    const t = window.useTime();
+    const P = window.PHYSICS;
+    if (!P) return null;
+    const N = P.N;
+    const rowH = (h - gap * (N - 1)) / N;
+    const appearOpacity = clamp((t - 9.5) / 0.8, 0, 1);
+    const sparsityT = clamp((t - 10.0) / 4.0, 0, 1);
+    const eased = Easing.easeInOutCubic(sparsityT);
+
+    const rows = [];
+    for (let i = 0; i < N; i++) {
+      const dofIdx = N - 1 - i;
+      const py = y + i * (rowH + gap);
+      const pre  = P.sparsity_pre[dofIdx];
+      const post = P.sparsity_post[dofIdx];
+      const val  = pre + (post - pre) * eased;
+      const isActive = (dofIdx === 2);
+      const barW = val * w;
+      rows.push(
+        <g key={i}>
+          <rect x={x} y={py + rowH * 0.25} width={w} height={rowH * 0.5}
+            fill="none" stroke={INK_SOFT} strokeWidth={0.4} opacity={0.35} />
+          <rect x={x} y={py + rowH * 0.25} width={barW} height={rowH * 0.5}
+            fill={isActive ? ACCENT : INK_SOFT}
+            opacity={isActive ? 1 : 0.55}
+          />
+        </g>
+      );
+    }
+
+    return (
+      <g opacity={appearOpacity}>
+        <text x={x} y={y - 8}
+          fontFamily="'Source Serif 4', Georgia, serif"
+          fontSize={13} fill={INK} fontStyle="italic">
+          σᵢ / ℓᵢ
+        </text>
+        <text x={x} y={y - 23}
+          fontFamily="Inter, system-ui, sans-serif"
+          fontSize={11} fill={FAINT} letterSpacing="0.04em">
+          MAP, sparsity prior
+        </text>
+        {rows}
+      </g>
+    );
+  }
+
+  window.LambdaPanels = LambdaPanels;
+  window.SparsityBar = SparsityBar;
+})();
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// scenes.jsx — Captions, equation plate, App composition
+// ═══════════════════════════════════════════════════════════════════════════
+
+(function () {
+  const INK = '#111';
+  const INK_SOFT = '#3a3a3a';
+  const FAINT = 'rgba(17,17,17,0.55)';
+  const PAPER = '#F6F3EC';
+  const ACCENT = '#C97B2A';
+  const ERROR = '#A23A2E';
+
+  // ── Caption phases (storey 3 fix applied) ──────────────────────────────
+  const CAPTIONS = [
+    { start: 0.0,  end: 2.0,  text: 'True structure has a hidden nonlinearity at storey 3.' },
+    { start: 2.0,  end: 6.0,  text: 'A linear model misses it — predictions drift from the true response.' },
+    { start: 6.0,  end: 10.0, text: 'Model the missing physics as latent forces η(t), one per DOF, each a Gaussian process.' },
+    { start: 10.0, end: 14.0, text: 'A sparsity-promoting prior switches off the DOFs that don\u2019t need correction.' },
+    { start: 14.0, end: 18.0, text: 'What remains localises the discrepancy.' },
+  ];
+
+  function CaptionTrack({ x, y, w, h }) {
+    const t = window.useTime();
+    const fade = 0.35;
+    return (
+      <g>
+        <line x1={x} y1={y} x2={x + w} y2={y}
+          stroke={INK} strokeWidth={0.5} opacity={0.18} />
+        {CAPTIONS.map((c, i) => {
+          const inT  = clamp((t - c.start) / fade, 0, 1);
+          const outT = clamp((c.end - t) / fade, 0, 1);
+          const opacity = Math.min(inT, outT);
+          if (opacity <= 0) return null;
+          return (
+            <foreignObject key={i} x={x} y={y + 8} width={w} height={h - 8}>
+              <div xmlns="http://www.w3.org/1999/xhtml"
+                style={{
+                  opacity,
+                  fontFamily: "'Source Serif 4', 'Source Serif Pro', Georgia, serif",
+                  fontSize: 17,
+                  color: INK,
+                  lineHeight: 1.35,
+                  letterSpacing: '0.005em',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 16,
+                }}>
+                <span style={{
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  fontSize: 12,
+                  color: FAINT,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  flexShrink: 0,
+                  paddingTop: 3,
+                  fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {String(i + 1).padStart(2, '0')} / 05
+                </span>
+                <span>{c.text}</span>
+              </div>
+            </foreignObject>
+          );
+        })}
+      </g>
+    );
+  }
+
+  // ── KaTeX equation plate (14..18s) ────────────────────────────────────
+  const EQN_TEX = String.raw`\mathbf{M}\ddot{\mathbf{q}}(t) + \mathbf{C}\dot{\mathbf{q}}(t) + \mathbf{K}\mathbf{q}(t) \;=\; \mathbf{S}_{u}\,\mathbf{u}(t) \;-\; \mathbf{S}_{p}\,\boldsymbol{\eta}(t),\qquad \eta_{i}(t) \sim \mathcal{GP}\!\bigl(0,\, k(t;\,\sigma_{i},\ell_{i})\bigr)`;
+
+  function EquationPlate({ x, y, w, h }) {
+    const t = window.useTime();
+    const [html, setHtml] = React.useState(window.__eqnCache || '');
+
+    React.useEffect(() => {
+      if (html) return;
+      let cancelled = false;
+      const tryRender = () => {
+        if (cancelled) return;
+        if (!window.katex) { setTimeout(tryRender, 100); return; }
+        try {
+          const s = window.katex.renderToString(EQN_TEX, {
+            throwOnError: false,
+            displayMode: true,
+            output: 'html',
+          });
+          window.__eqnCache = s;
+          setHtml(s);
+        } catch (e) {
+          setHtml('<span>' + EQN_TEX + '</span>');
+        }
+      };
+      tryRender();
+      return () => { cancelled = true; };
+    }, []);
+
+    const opacity = clamp((t - 14.0) / 0.7, 0, 1);
+    if (opacity <= 0 || !html) return null;
+
+    return (
+      <foreignObject x={x} y={y} width={w} height={h}>
+        <div xmlns="http://www.w3.org/1999/xhtml"
+          style={{
+            width: '100%', height: '100%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            opacity, color: INK, fontSize: 18, lineHeight: 1.1,
+          }}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </foreignObject>
+    );
+  }
+
+  function GroundSparkline({ x, y, w, h }) {
+    const t = window.useTime();
+    const P = window.PHYSICS;
+    if (!P) return null;
+    const T = P.T;
+    const N = 200;
+    const pts = [];
+    let maxA = 0;
+    for (let i = 0; i < N; i++) {
+      const tau = (i / (N - 1)) * T;
+      const a = P.sample1(P.ag, tau);
+      pts.push([tau, a]);
+      if (Math.abs(a) > maxA) maxA = Math.abs(a);
+    }
+    if (maxA < 1e-6) maxA = 1;
+    let d = '';
+    pts.forEach(([tau, a], i) => {
+      const px = x + (tau / T) * w;
+      const py = y + h / 2 - (a / maxA) * (h * 0.42);
+      d += (i ? 'L' : 'M') + px.toFixed(1) + ',' + py.toFixed(1) + ' ';
+    });
+    const cursorX = x + (t / T) * w;
+    const cursorA = P.sample1(P.ag, t);
+    const cursorY = y + h / 2 - (cursorA / maxA) * (h * 0.42);
+    return (
+      <g>
+        <text x={x} y={y - 4}
+          fontFamily="Inter, system-ui, sans-serif"
+          fontSize={11} fill={FAINT} letterSpacing="0.04em">
+          ground acceleration ü(t)
+        </text>
+        <line x1={x} y1={y + h / 2} x2={x + w} y2={y + h / 2}
+          stroke={INK} strokeWidth={0.4} opacity={0.4} />
+        <path d={d} stroke={INK} strokeWidth={1} fill="none" opacity={0.8} />
+        <line x1={cursorX} y1={y} x2={cursorX} y2={y + h}
+          stroke={INK} strokeWidth={0.6} opacity={0.35} />
+        <circle cx={cursorX} cy={cursorY} r={1.8} fill={INK} />
+      </g>
+    );
+  }
+
+  // ── Phase ribbon ─────────────────────────────────────────────────────────
+  function PhaseRibbon({ x, y, w }) {
+    const t = window.useTime();
+    const T = 18;
+    const phases = [0, 2, 6, 10, 14, 18];
+    return (
+      <g>
+        <line x1={x} y1={y} x2={x + w} y2={y} stroke={INK} strokeWidth={0.4} opacity={0.25} />
+        {phases.map((p, i) => {
+          const px = x + (p / T) * w;
+          const active = t >= p;
+          return (
+            <g key={i}>
+              <line x1={px} y1={y - 3} x2={px} y2={y + 3}
+                stroke={INK} strokeWidth={active ? 1.2 : 0.4}
+                opacity={active ? 0.7 : 0.25} />
+            </g>
+          );
+        })}
+        <circle cx={x + (t / T) * w} cy={y} r={3} fill={INK} />
+      </g>
+    );
+  }
+
+  // ── Citation overlay (top-right inside video) ───────────────────────────
+  function CitationOverlay({ W }) {
+    return (
+      <g>
+        <text
+          x={W - 28}
+          y={22}
+          fontFamily="'Source Serif 4', Georgia, serif"
+          fontSize={12}
+          fill={INK_SOFT}
+          textAnchor="end"
+          opacity={0.7}
+        >
+          <tspan>Kashyap, Rogers, Nayek · </tspan>
+          <tspan fontStyle="italic">Mech. Syst. Signal Process.</tspan>
+          <tspan> (2024)</tspan>
+        </text>
+      </g>
+    );
+  }
+
+  // ── App ──────────────────────────────────────────────────────────────────
+  function App() {
+    const W = 960, H = 540;
+    return (
+      <window.Stage
+        width={W} height={H}
+        duration={18}
+        background={PAPER}
+        loop={true}
+        autoplay={true}
+        persistKey="anim1"
+      >
+        <SceneSVG />
+      </window.Stage>
+    );
+  }
+
+  function SceneSVG() {
+    const t = window.useTime();
+    const W = 960, H = 540;
+    const showGhost = t >= 2.0;
+
+    const panelsX = 462;
+    const panelsY = 90;
+    const panelsW = 360;
+    const panelsH = 234;
+    const sparsityX = panelsX + panelsW + 18;
+    const sparsityW = 60;
+
+    return (
+      <div style={{
+        position: 'absolute', inset: 0,
+        fontFamily: "'Source Serif 4', Georgia, serif",
+      }}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          width={W} height={H}
+          style={{ display: 'block', background: PAPER }}
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          {/* Citation in top-right corner */}
+          <CitationOverlay W={W} />
+
+          {/* Shear-frame diagram */}
+          <window.ShearFrameDiagram
+            x={28} y={74}
+            w={400} h={272}
+            showGhost={showGhost}
+          />
+
+          {/* Ground sparkline */}
+          <GroundSparkline x={28} y={358} w={400} h={20} />
+
+          {/* η panels + sparsity bar */}
+          <LambdaPanels
+            x={panelsX} y={panelsY}
+            w={panelsW} h={panelsH}
+          />
+          <SparsityBar
+            x={sparsityX} y={panelsY}
+            w={sparsityW} h={panelsH}
+          />
+
+          {/* Equation plate */}
+          <EquationPlate x={28} y={392} w={W - 56} h={48} />
+
+          {/* Caption track */}
+          <CaptionTrack x={28} y={448} w={W - 56} h={88} />
+
+          {/* Phase ribbon */}
+          <PhaseRibbon x={28} y={528} w={W - 56} />
+        </svg>
+      </div>
+    );
+  }
+
+  // Bootstrap
+  function mount() {
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  }
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', mount);
+  } else {
+    mount();
+  }
+})();
+  </script>
+</body>
+</html>
