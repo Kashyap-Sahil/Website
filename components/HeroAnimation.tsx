@@ -24,8 +24,9 @@ export function HeroAnimation() {
         title=""
         tabIndex={-1}
         scrolling="no"
-        className="block w-full border-0"
+        className="absolute left-1/2 top-1/2 block border-0 -translate-x-1/2 -translate-y-1/2"
         style={{
+          width: "128vw",
           height: `calc(100% + ${PLAYER_HEIGHT}px)`,
           background: "#f6f3ec",
         }}
