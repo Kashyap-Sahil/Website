@@ -57,4 +57,58 @@ export const site = {
     },
   ],
   projects: [],
+  education: [
+    {
+      degree: "PhD in Applied Mechanics",
+      institution: "Indian Institute of Technology Delhi (IIT Delhi)",
+      years: "2022 – Ongoing",
+      note: "",
+    },
+    {
+      degree: "M.Tech. in Engineering Analysis and Design",
+      institution:
+        "Motilal Nehru National Institute of Technology Allahabad (MNNIT Allahabad)",
+      years: "2019 – 2021",
+      note: "CGPA: 8.00 / 10",
+    },
+    {
+      degree: "B.Tech. in Mechanical Engineering",
+      institution: "Kalinga Institute of Industrial Technology (KIIT), Bhubaneswar",
+      years: "2013 – 2017",
+      note: "CGPA: 8.31 / 10",
+    },
+  ],
+  skills: [
+    {
+      group: "Programming",
+      items: ["MATLAB", "Python", "Abaqus"],
+    },
+    {
+      group: "Machine Learning & Inference",
+      items: [
+        "Gaussian Processes",
+        "Bayesian Filtering & Smoothing",
+        "Kalman Filtering",
+        "Bayesian Inference",
+        "Bayesian Neural Networks",
+      ],
+    },
+    {
+      group: "Signal Processing",
+      items: [
+        "Time-Series Analysis",
+        "Statistical Signal Processing",
+        "Sensor Data Analytics",
+      ],
+    },
+    {
+      group: "Engineering",
+      items: [
+        "System Identification",
+        "Structural Dynamics",
+        "State Estimation",
+        "Probabilistic Forecasting",
+      ],
+    },
+  ],
 };

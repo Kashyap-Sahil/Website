@@ -10,12 +10,18 @@ export function Nav() {
       >
         {site.name}
       </Link>
-      <nav className="flex gap-7 text-sm text-muted">
+      <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted">
         <a href="#research" className="hover:text-ink transition-colors">
           Research
         </a>
         <a href="#about" className="hover:text-ink transition-colors">
           About
+        </a>
+        <a href="#education" className="hover:text-ink transition-colors">
+          Education
+        </a>
+        <a href="#skills" className="hover:text-ink transition-colors">
+          Skills
         </a>
         <a href="#contact" className="hover:text-ink transition-colors">
           Contact
