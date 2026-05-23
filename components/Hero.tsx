@@ -4,7 +4,7 @@ import { site } from "@/content/site";
 export function Hero() {
   return (
     <section className="mx-auto max-w-5xl px-6 pt-20 pb-28 sm:px-10 sm:pt-28 sm:pb-36">
-      <div className="flex items-center gap-6 mb-10">
+      <div className="flex items-center gap-6 mb-10 intro intro-delay-1">
         <Image
           src={site.avatar}
           alt={site.name}
@@ -18,10 +18,10 @@ export function Hero() {
           {site.location ? ` — ${site.location}` : ""}
         </p>
       </div>
-      <p className="mt-10 max-w-3xl font-serif text-2xl leading-snug text-ink/85 sm:text-3xl md:text-4xl">
+      <p className="mt-10 max-w-3xl font-serif text-2xl leading-snug text-ink/85 sm:text-3xl md:text-4xl intro intro-delay-2">
         {site.tagline}
       </p>
-      <div className="mt-12 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+      <div className="mt-12 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm intro intro-delay-3">
         <a
           href="#research"
           className="border-b border-ink pb-0.5 text-ink hover:opacity-60 transition-opacity"

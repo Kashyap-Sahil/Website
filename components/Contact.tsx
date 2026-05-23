@@ -4,7 +4,7 @@ import { Section } from "./Section";
 export function Contact() {
   return (
     <Section id="contact" label="Contact">
-      <p className="font-serif text-2xl leading-relaxed sm:text-3xl">
+      <p className="font-serif text-2xl leading-relaxed sm:text-3xl reveal">
         Always open to a thoughtful conversation —{" "}
         <a
           href={`mailto:${site.email}`}
@@ -14,7 +14,7 @@ export function Contact() {
         </a>
         .
       </p>
-      <ul className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm">
+      <ul className="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm reveal-fade">
         {site.links.map((link) => (
           <li key={link.label}>
             <a
