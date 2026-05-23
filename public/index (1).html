@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Probabilistic Digital Twin — Animated Abstract</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --bg:       #F6F3EC;
+    --ink:      #141414;
+    --ink-soft: #4a4a4a;
+    --ink-mute: #8a8a82;
+    --rule:     rgba(20,20,20,0.14);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: var(--bg);
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body { visibility: hidden; }
+  body.ready { visibility: visible; }
+
+  .stage {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .canvas {
+    position: relative;
+    width:  min(100vw, calc(100vh * 16 / 9));
+    height: min(100vh, calc(100vw * 9 / 16));
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  /* ===========================
+     Persistent chrome
+     =========================== */
+
+  .stamp {
+    position: absolute;
+    top: 3.6%;
+    right: 4.5%;
+    font-family: 'Inter', sans-serif;
+    font-size: clamp(0.65rem, 0.85vw, 0.85rem);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    opacity: 0;
+    animation: fadeIn 1s ease-out 0.3s forwards;
+    z-index: 5;
+  }
+  .stamp::after {
+    content: "";
+    display: inline-block;
+    width: 26px; height: 1px;
+    background: var(--ink-mute);
+    vertical-align: middle;
+    margin-left: 10px;
+    transform: translateY(-2px);
+  }
+
+  .scene-counter {
+    position: absolute;
+    top: 3.6%;
+    left: 4.5%;
+    font-family: 'Inter', sans-serif;
+    font-size: clamp(0.65rem, 0.85vw, 0.85rem);
+    letter-spacing: 0.16em;
+    color: var(--ink-mute);
+    opacity: 0;
+    animation: fadeIn 1s ease-out 0.5s forwards;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 0.7em;
+  }
+  .scene-counter .roman {
+    color: var(--ink);
+    font-weight: 500;
+    min-width: 2.4em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .scene-counter .roman span {
+    display: inline-block;
+    animation: roman-cycle 20s steps(1) infinite;
+    animation-play-state: paused;
+  }
+  body.ready .scene-counter .roman span { animation-play-state: running; }
+  @keyframes roman-cycle {
+    0%, 19.9%   { content: "00"; }
+    20%, 39.9%  { content: "I"; }
+    40%, 59.9%  { content: "II"; }
+    60%, 79.9%  { content: "III"; }
+    80%, 100%   { content: "▣"; }
+  }
+  /* Above CSS content trick only works on ::before. Use 5 stacked spans instead. */
+
+  /* The persistent bottom baseline that fills proportional to loop progress */
+  .baseline {
+    position: absolute;
+    left: 0; right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--rule);
+    z-index: 5;
+  }
+  .baseline-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: var(--ink);
+    width: 0%;
+    animation: baseline-progress 20s linear infinite;
+    animation-play-state: paused;
+  }
+  body.ready .baseline-fill { animation-play-state: running; }
+  @keyframes baseline-progress {
+    0%   { width: 0%; }
+    100% { width: 100%; }
+  }
+
+  /* Tick marks on the baseline at scene boundaries */
+  .baseline-tick {
+    position: absolute;
+    bottom: -3px;
+    width: 1px;
+    height: 7px;
+    background: var(--rule);
+  }
+
+  /* Scene playhead — small dot riding the baseline */
+  .playhead {
+    position: absolute;
+    bottom: -3px;
+    left: 0;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ink);
+    transform: translateX(-3.5px);
+    animation: playhead-move 20s linear infinite;
+    animation-play-state: paused;
+    z-index: 6;
+  }
+  body.ready .playhead { animation-play-state: running; }
+  @keyframes playhead-move {
+    0%   { left: 0%; }
+    100% { left: 100%; }
+  }
+
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  /* ============================================================
+     Scenes share a 20s animation cycle.
+     5 scenes × 4s each.
+     ============================================================ */
+  .scene {
+    position: absolute;
+    inset: 0;
+    padding: 9% 7% 10%;
+    opacity: 0;
+    display: flex;
+    flex-direction: column;
+    animation-duration: 20s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
+    animation-play-state: paused;
+  }
+  body.ready .scene { animation-play-state: running; }
+
+  /* Scene container fades, but most internal motion is staggered via
+     sub-element keyframes also running on a 20s cycle. */
+  .scene.s1 { animation-name: s1-show; }
+  .scene.s2 { animation-name: s2-show; }
+  .scene.s3 { animation-name: s3-show; }
+  .scene.s4 { animation-name: s4-show; }
+  .scene.s5 { animation-name: s5-show; }
+
+  /* Each scene window: 4s of visibility with 0.5s crossfade either side */
+  @keyframes s1-show {
+    0%   { opacity: 0; }
+    1%   { opacity: 1; }
+    18%  { opacity: 1; }
+    21%  { opacity: 0; }
+    100% { opacity: 0; }
+  }
+  @keyframes s2-show {
+    0%, 18% { opacity: 0; }
+    21%     { opacity: 1; }
+    38%     { opacity: 1; }
+    41%, 100% { opacity: 0; }
+  }
+  @keyframes s3-show {
+    0%, 38% { opacity: 0; }
+    41%     { opacity: 1; }
+    58%     { opacity: 1; }
+    61%, 100% { opacity: 0; }
+  }
+  @keyframes s4-show {
+    0%, 58% { opacity: 0; }
+    61%     { opacity: 1; }
+    78%     { opacity: 1; }
+    81%, 100% { opacity: 0; }
+  }
+  @keyframes s5-show {
+    0%, 78% { opacity: 0; }
+    81%     { opacity: 1; }
+    99%     { opacity: 1; }
+    100%    { opacity: 0; }
+  }
+
+  /* ===========================
+     Typography
+     =========================== */
+  .title-display {
+    font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+    font-weight: 500;
+    font-size: clamp(2.4rem, 5.6vw, 5.4rem);
+    line-height: 1.04;
+    letter-spacing: -0.012em;
+  }
+  .title-display em {
+    font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ink-soft);
+  }
+  .title-sub {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    font-size: clamp(0.95rem, 1.5vw, 1.45rem);
+    color: var(--ink-soft);
+    letter-spacing: 0.005em;
+    margin-top: 1.2rem;
+    line-height: 1.4;
+  }
+  .title-method {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: clamp(0.72rem, 1vw, 0.95rem);
+    color: var(--ink);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    margin-top: 2.2rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 1em;
+  }
+  .title-method .chip {
+    display: inline-block;
+  }
+  .title-method .dot {
+    display: inline-block;
+    width: 4px; height: 4px;
+    background: var(--ink-mute);
+    border-radius: 50%;
+  }
+
+  .stage-tag {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: clamp(0.7rem, 0.92vw, 0.88rem);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .stage-tag b {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .stage-heading {
+    font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+    font-weight: 500;
+    font-size: clamp(1.9rem, 3.6vw, 3.2rem);
+    letter-spacing: -0.008em;
+    line-height: 1.08;
+    margin-top: 0.5rem;
+  }
+  .stage-heading em {
+    font-style: italic;
+    font-weight: 400;
+    color: var(--ink-soft);
+  }
+
+  .stage-lede {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+    font-size: clamp(0.9rem, 1.3vw, 1.18rem);
+    color: var(--ink-soft);
+    line-height: 1.45;
+    margin-top: 1rem;
+    max-width: 56ch;
+  }
+
+  /* ===========================
+     Layout pieces
+     =========================== */
+  .title-block {
+    margin: auto;
+    text-align: center;
+    max-width: 85%;
+  }
+
+  .scene-header {
+    margin-bottom: 2vh;
+  }
+
+  .scene-body {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 3.2vw;
+    align-items: center;
+    min-height: 0;
+  }
+  .scene-body .col { min-height: 0; min-width: 0; }
+  .scene-body .col-diagram {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+  }
+  .scene-body .col-eqs {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  /* ===========================
+     Equation styling
+     =========================== */
+  .eqs {
+    display: flex;
+    flex-direction: column;
+    gap: 1.3em;
+  }
+  .eq {
+    font-size: clamp(0.85rem, 1.18vw, 1.15rem);
+    color: var(--ink);
+    opacity: 0;
+  }
+  .eq .lbl {
+    display: block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.66em;
+    color: var(--ink-mute);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 0.4em;
+    font-weight: 500;
+  }
+  .katex { font-size: 1em; }
+  .katex-display { margin: 0; overflow-x: visible; overflow-y: hidden; }
+  .katex-display > .katex { text-align: left; white-space: normal; }
+
+  /* ===========================
+     SVG diagram base
+     =========================== */
+  .diagram {
+    width: 100%;
+    height: auto;
+    max-height: 56vh;
+    max-width: 100%;
+    color: var(--ink);
+  }
+  .diagram .ln       { stroke: var(--ink); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .diagram .ln-thin  { stroke: var(--ink); fill: none; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+  .diagram .ln-mute  { stroke: var(--ink-mute); fill: none; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+  .diagram .fill-ink { fill: var(--ink); }
+  .diagram .lbl {
+    font-family: 'Inter', sans-serif;
+    fill: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .diagram .lbl-sm {
+    font-family: 'Inter', sans-serif;
+    fill: var(--ink-soft);
+    font-size: 10px;
+    font-weight: 400;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .diagram .lbl-var {
+    font-family: 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+    font-style: italic;
+    fill: var(--ink);
+    font-size: 16px;
+  }
+
+  /* Marching dashed line */
+  @keyframes dash-march {
+    to { stroke-dashoffset: -40; }
+  }
+  .march {
+    stroke-dasharray: 5 5;
+    animation: dash-march 1.6s linear infinite;
+  }
+  @keyframes dash-march-slow {
+    to { stroke-dashoffset: -80; }
+  }
+  .march-slow {
+    stroke-dasharray: 4 6;
+    animation: dash-march-slow 3.2s linear infinite;
+  }
+
+  /* SVG draw-on, used on stroke-dasharray paths */
+  .draw-on { stroke-dasharray: 1000; stroke-dashoffset: 1000; }
+
+  /* ============================================================
+     Sequenced sub-element keyframes — all on the 20s cycle.
+     Each scene window is roughly:
+       s1: 0–20%   (centered ~0–4s)
+       s2: 20–40%
+       s3: 40–60%
+       s4: 60–80%
+       s5: 80–100%
+     ============================================================ */
+
+  /* ---- Scene 1: staggered title reveal + drifting underline ---- */
+  .s1 .title-display {
+    opacity: 0;
+    transform: translateY(8px);
+    animation: s1-title 20s linear infinite;
+    animation-play-state: paused;
+  }
+  body.ready .s1 .title-display { animation-play-state: running; }
+  @keyframes s1-title {
+    0%     { opacity: 0; transform: translateY(14px); }
+    3%     { opacity: 1; transform: translateY(0); }
+    18%    { opacity: 1; transform: translateY(0); }
+    21%    { opacity: 0; transform: translateY(-4px); }
+    100%   { opacity: 0; transform: translateY(-4px); }
+  }
+
+  .s1 .title-sub {
+    opacity: 0;
+    animation: s1-sub 20s linear infinite;
+    animation-play-state: paused;
+  }
+  body.ready .s1 .title-sub { animation-play-state: running; }
+  @keyframes s1-sub {
+    0%, 3%   { opacity: 0; }
+    7%       { opacity: 1; }
+    18%      { opacity: 1; }
+    21%, 100%{ opacity: 0; }
+  }
+
+  .s1 .title-method {
+    opacity: 0;
+    animation: s1-method 20s linear infinite;
+    animation-play-state: paused;
+  }
+  body.ready .s1 .title-method { animation-play-state: running; }
+  @keyframes s1-method {
+    0%, 8%   { opacity: 0; }
+    11%      { opacity: 1; }
+    18%      { opacity: 1; }
+    21%, 100%{ opacity: 0; }
+  }
+
+  /* a slowly traveling hairline beneath the title, just to keep motion alive */
+  .s1 .title-ornament {
+    position: relative;
+    height: 1px;
+    width: 36%;
+    margin: 2.4rem auto 0;
+    background: var(--rule);
+    opacity: 0;
+    animation: s1-orn 20s linear infinite;
+    animation-play-state: paused;
+  }
+  body.ready .s1 .title-ornament { animation-play-state: running; }
+  @keyframes s1-orn {
+    0%, 5%   { opacity: 0; transform: scaleX(0); }
+    9%       { opacity: 1; transform: scaleX(1); }
+    18%      { opacity: 1; transform: scaleX(1); }
+    21%, 100%{ opacity: 0; }
+  }
+  .s1 .title-ornament::after {
+    content: "";
+    position: absolute;
+    top: -2px; left: 0;
+    width: 12%;
+    height: 5px;
+    border-radius: 5px;
+    background: var(--ink);
+    animation: s1-orn-dot 4s ease-in-out infinite alternate;
+    animation-play-state: paused;
+  }
+  body.ready .s1 .title-ornament::after { animation-play-state: running; }
+  @keyframes s1-orn-dot {
+    0%   { left: 0%; }
+    100% { left: 88%; }
+  }
+
+  /* ---- Generic stagger fades for scene 2/3/4 children ---- */
+  /* header, then diagram, then equations 1/2/3, each ~0.4s apart */
+
+  /* Scene 2 (window 20%–40%) */
+  .s2 .scene-header { animation: s2-h 20s linear infinite; animation-play-state: paused; }
+  .s2 .col-diagram  { animation: s2-d 20s linear infinite; animation-play-state: paused; opacity: 0; }
+  .s2 .eq:nth-child(1) { animation: s2-e1 20s linear infinite; animation-play-state: paused; }
+  .s2 .eq:nth-child(2) { animation: s2-e2 20s linear infinite; animation-play-state: paused; }
+  .s2 .eq:nth-child(3) { animation: s2-e3 20s linear infinite; animation-play-state: paused; }
+  body.ready .s2 > *,
+  body.ready .s2 .scene-header,
+  body.ready .s2 .col-diagram,
+  body.ready .s2 .eq { animation-play-state: running; }
+  @keyframes s2-h  { 0%,20%{opacity:0;transform:translateY(6px)} 23%{opacity:1;transform:translateY(0)} 38%{opacity:1;transform:translateY(0)} 41%,100%{opacity:0} }
+  @keyframes s2-d  { 0%,22%{opacity:0;transform:translateY(8px)} 25%{opacity:1;transform:translateY(0)} 38%{opacity:1;transform:translateY(0)} 41%,100%{opacity:0} }
+  @keyframes s2-e1 { 0%,24%{opacity:0;transform:translateY(6px)} 27%{opacity:1;transform:translateY(0)} 38%{opacity:1;transform:translateY(0)} 41%,100%{opacity:0} }
+  @keyframes s2-e2 { 0%,27%{opacity:0;transform:translateY(6px)} 30%{opacity:1;transform:translateY(0)} 38%{opacity:1;transform:translateY(0)} 41%,100%{opacity:0} }
+  @keyframes s2-e3 { 0%,30%{opacity:0;transform:translateY(6px)} 33%{opacity:1;transform:translateY(0)} 38%{opacity:1;transform:translateY(0)} 41%,100%{opacity:0} }
+
+  /* Scene 3 (window 40%–60%) */
+  .s3 .scene-header { animation: s3-h 20s linear infinite; animation-play-state: paused; }
+  .s3 .col-diagram  { animation: s3-d 20s linear infinite; animation-play-state: paused; opacity: 0; }
+  .s3 .eq:nth-child(1) { animation: s3-e1 20s linear infinite; animation-play-state: paused; }
+  .s3 .eq:nth-child(2) { animation: s3-e2 20s linear infinite; animation-play-state: paused; }
+  .s3 .eq:nth-child(3) { animation: s3-e3 20s linear infinite; animation-play-state: paused; }
+  body.ready .s3 .scene-header,
+  body.ready .s3 .col-diagram,
+  body.ready .s3 .eq { animation-play-state: running; }
+  @keyframes s3-h  { 0%,40%{opacity:0;transform:translateY(6px)} 43%{opacity:1;transform:translateY(0)} 58%{opacity:1;transform:translateY(0)} 61%,100%{opacity:0} }
+  @keyframes s3-d  { 0%,42%{opacity:0;transform:translateY(8px)} 45%{opacity:1;transform:translateY(0)} 58%{opacity:1;transform:translateY(0)} 61%,100%{opacity:0} }
+  @keyframes s3-e1 { 0%,44%{opacity:0;transform:translateY(6px)} 47%{opacity:1;transform:translateY(0)} 58%{opacity:1;transform:translateY(0)} 61%,100%{opacity:0} }
+  @keyframes s3-e2 { 0%,47%{opacity:0;transform:translateY(6px)} 50%{opacity:1;transform:translateY(0)} 58%{opacity:1;transform:translateY(0)} 61%,100%{opacity:0} }
+  @keyframes s3-e3 { 0%,50%{opacity:0;transform:translateY(6px)} 53%{opacity:1;transform:translateY(0)} 58%{opacity:1;transform:translateY(0)} 61%,100%{opacity:0} }
+
+  /* Scene 4 (window 60%–80%) */
+  .s4 .scene-header { animation: s4-h 20s linear infinite; animation-play-state: paused; }
+  .s4 .col-diagram  { animation: s4-d 20s linear infinite; animation-play-state: paused; opacity: 0; }
+  .s4 .eq:nth-child(1) { animation: s4-e1 20s linear infinite; animation-play-state: paused; }
+  .s4 .eq:nth-child(2) { animation: s4-e2 20s linear infinite; animation-play-state: paused; }
+  .s4 .eq:nth-child(3) { animation: s4-e3 20s linear infinite; animation-play-state: paused; }
+  body.ready .s4 .scene-header,
+  body.ready .s4 .col-diagram,
+  body.ready .s4 .eq { animation-play-state: running; }
+  @keyframes s4-h  { 0%,60%{opacity:0;transform:translateY(6px)} 63%{opacity:1;transform:translateY(0)} 78%{opacity:1;transform:translateY(0)} 81%,100%{opacity:0} }
+  @keyframes s4-d  { 0%,62%{opacity:0;transform:translateY(8px)} 65%{opacity:1;transform:translateY(0)} 78%{opacity:1;transform:translateY(0)} 81%,100%{opacity:0} }
+  @keyframes s4-e1 { 0%,64%{opacity:0;transform:translateY(6px)} 67%{opacity:1;transform:translateY(0)} 78%{opacity:1;transform:translateY(0)} 81%,100%{opacity:0} }
+  @keyframes s4-e2 { 0%,67%{opacity:0;transform:translateY(6px)} 70%{opacity:1;transform:translateY(0)} 78%{opacity:1;transform:translateY(0)} 81%,100%{opacity:0} }
+  @keyframes s4-e3 { 0%,70%{opacity:0;transform:translateY(6px)} 73%{opacity:1;transform:translateY(0)} 78%{opacity:1;transform:translateY(0)} 81%,100%{opacity:0} }
+
+  /* Scene 5 (window 80%–100%) — header staggers, plot reveals via sweep */
+  .s5 .scene-header { animation: s5-h 20s linear infinite; animation-play-state: paused; opacity: 0; }
+  .s5 .plot-host    { animation: s5-d 20s linear infinite; animation-play-state: paused; opacity: 0; }
+  body.ready .s5 .scene-header,
+  body.ready .s5 .plot-host { animation-play-state: running; }
+  @keyframes s5-h  { 0%,80%{opacity:0;transform:translateY(6px)} 83%{opacity:1;transform:translateY(0)} 99%{opacity:1;transform:translateY(0)} 100%{opacity:0} }
+  @keyframes s5-d  { 0%,82%{opacity:0;transform:translateY(8px)} 85%{opacity:1;transform:translateY(0)} 99%{opacity:1;transform:translateY(0)} 100%{opacity:0} }
+
+  /* ============================================================
+     Continuous motion within scenes
+     ============================================================ */
+
+  /* Scene 2 — sensor waveform: scrolling oscillation */
+  @keyframes scroll-wave {
+    0%   { transform: translateX(0); }
+    100% { transform: translateX(-96px); }
+  }
+  .wave-scroll {
+    animation: scroll-wave 3s linear infinite;
+  }
+
+  /* generic playhead dot pulsing */
+  @keyframes pulse-dot {
+    0%, 100% { r: 2; opacity: 0.85; }
+    50%      { r: 4; opacity: 1; }
+  }
+  .pulse-dot { animation: pulse-dot 1.2s ease-in-out infinite; }
+
+  /* Pulse along path via SVG <animateMotion> handles itself; CSS just for fades */
+
+  /* Scene 3 — BNN connection "firing" pulses (handled via animateMotion in SVG) */
+  /* Subtle node breathing */
+  @keyframes node-breathe {
+    0%, 100% { opacity: 0.5; }
+    50%      { opacity: 1; }
+  }
+  .bnn-node { animation: node-breathe 2.4s ease-in-out infinite; }
+  .bnn-node:nth-child(2) { animation-delay: 0.3s; }
+  .bnn-node:nth-child(3) { animation-delay: 0.6s; }
+  .bnn-node:nth-child(4) { animation-delay: 0.9s; }
+  .bnn-node:nth-child(5) { animation-delay: 1.2s; }
+
+  /* Scene 5 — sweep reveal of plot */
+  .s5 .reveal-mask {
+    /* The reveal rect inside SVG scales over time to expose the plot left→right */
+  }
+
+  /* For very tall/narrow screens, stack columns */
+  @media (max-aspect-ratio: 4/5) {
+    .scene-body {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto;
+      gap: 3vh;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="canvas">
+
+    <div class="stamp">Kashyap &middot; Nayek &nbsp;&nbsp;/&nbsp;&nbsp; IIT Delhi</div>
+    <div class="scene-counter"><span class="roman" id="roman">—</span><span>STAGES</span></div>
+
+    <div class="baseline">
+      <div class="baseline-tick" style="left: 20%"></div>
+      <div class="baseline-tick" style="left: 40%"></div>
+      <div class="baseline-tick" style="left: 60%"></div>
+      <div class="baseline-tick" style="left: 80%"></div>
+      <div class="baseline-fill"></div>
+    </div>
+    <div class="playhead"></div>
+
+    <!-- ============================================
+         SCENE 1 — TITLE
+         ============================================ -->
+    <div class="scene s1">
+      <div class="title-block">
+        <div class="title-display">
+          <em>Probabilistic</em> Digital&nbsp;Twin
+        </div>
+        <div class="title-sub">
+          for misspecified structural dynamical systems
+        </div>
+        <div class="title-ornament"></div>
+        <div class="title-method">
+          <span class="chip">GPLFM</span>
+          <span class="dot"></span>
+          <span class="chip">Bayesian&nbsp;Neural&nbsp;Network</span>
+          <span class="dot"></span>
+          <span class="chip">Kalman&nbsp;Filtering</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================
+         SCENE 2 — DIAGNOSIS
+         ============================================ -->
+    <div class="scene s2">
+      <div class="scene-header">
+        <div class="stage-tag">Stage&nbsp;<b>I</b> &nbsp;/&nbsp; Diagnosis</div>
+        <div class="stage-heading">Latent forces <em>from data</em></div>
+        <div class="stage-lede">
+          Model-form errors are treated as latent forces and jointly inferred with
+          system states via a GP latent-force model.
+        </div>
+      </div>
+
+      <div class="scene-body">
+        <div class="col col-diagram">
+          <svg class="diagram" viewBox="0 0 560 320" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrowS2" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" class="fill-ink"></path>
+              </marker>
+
+              <!-- A long sensor wave that scrolls horizontally inside a clip -->
+              <clipPath id="sensorClip">
+                <rect x="0" y="0" width="120" height="80"></rect>
+              </clipPath>
+              <clipPath id="gpwaveClip">
+                <rect x="0" y="0" width="140" height="40"></rect>
+              </clipPath>
+
+              <!-- Path the data-pulse travels along: sensor → GPLFM → posterior -->
+              <path id="pathS2-flow1" d="M 140 175 L 200 175" fill="none"></path>
+              <path id="pathS2-flow2" d="M 360 175 L 420 175" fill="none"></path>
+            </defs>
+
+            <!-- ───── Sensor block ───── -->
+            <text class="lbl-sm" x="20" y="118">measurement&nbsp;y_k</text>
+            <g transform="translate(20,130)" clip-path="url(#sensorClip)">
+              <!-- We draw a wave 2x wider than its clip, and scroll it -->
+              <g class="wave-scroll">
+                <path class="ln-thin" d="
+                  M0,40 C8,18 16,62 24,34
+                  C32,12 40,58 48,30 C56,8 64,52 72,28
+                  C80,8 88,52 96,30
+                  C104,18 112,62 120,34
+                  C128,12 136,58 144,30 C152,8 160,52 168,28
+                  C176,8 184,52 192,30
+                  C200,18 208,62 216,34
+                "></path>
+              </g>
+              <!-- Frame outline -->
+              <rect x="0" y="0" width="120" height="80" fill="none" stroke="var(--ink-mute)" stroke-width="0.8" opacity="0.5"></rect>
+              <!-- Sweep line indicating "now" -->
+              <line x1="60" y1="0" x2="60" y2="80" stroke="var(--ink)" stroke-width="0.6" opacity="0.35"></line>
+            </g>
+            <text class="lbl-sm" x="20" y="230">input&nbsp;u_k</text>
+
+            <!-- Flow arrow into GPLFM (with a traveling pulse) -->
+            <line class="ln" x1="146" y1="175" x2="196" y2="175" marker-end="url(#arrowS2)"></line>
+            <circle r="3" class="fill-ink">
+              <animateMotion dur="1.6s" repeatCount="indefinite"
+                path="M 0 0 L 50 0" />
+              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="1.6s" repeatCount="indefinite" />
+              <animateTransform attributeName="transform" type="translate" from="146 175" to="146 175" />
+            </circle>
+
+            <!-- ───── GPLFM box ───── -->
+            <rect class="ln" x="200" y="95" width="160" height="160" rx="2"></rect>
+            <text class="lbl" x="280" y="128" text-anchor="middle" font-weight="600" font-size="15">GPLFM</text>
+            <text class="lbl-sm" x="280" y="146" text-anchor="middle">Kalman filter</text>
+            <text class="lbl-sm" x="280" y="161" text-anchor="middle">+ RTS smoother</text>
+
+            <!-- A small clipped GP wave that scrolls inside the box (latent force η) -->
+            <g transform="translate(210,190)" clip-path="url(#gpwaveClip)">
+              <g class="wave-scroll" style="animation-duration: 4s;">
+                <path class="ln-thin" d="
+                  M0,20 C12,6 26,32 38,18 C50,4 64,30 76,16
+                  C88,4 102,28 114,14 C126,4 140,28 152,16
+                  C164,4 178,28 190,14 C202,4 216,28 228,14
+                "></path>
+              </g>
+              <rect x="0" y="0" width="140" height="40" fill="none" stroke="var(--ink-mute)" stroke-width="0.6" opacity="0.4"></rect>
+            </g>
+            <text class="lbl-sm" x="280" y="246" text-anchor="middle">latent force&nbsp;η(t)</text>
+
+            <!-- Arrow out -->
+            <line class="ln" x1="360" y1="175" x2="416" y2="175" marker-end="url(#arrowS2)"></line>
+            <circle r="3" class="fill-ink">
+              <animateMotion dur="1.6s" begin="0.4s" repeatCount="indefinite"
+                path="M 360 175 L 410 175" />
+              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.15;0.85;1" dur="1.6s" begin="0.4s" repeatCount="indefinite" />
+            </circle>
+
+            <!-- ───── Posterior samples (3 stacked, draw on with stagger) ───── -->
+            <g transform="translate(420,100)">
+              <rect class="ln" x="0" y="0" width="120" height="150" rx="2"></rect>
+              <text class="lbl-sm" x="60" y="20" text-anchor="middle">POSTERIOR</text>
+
+              <!-- 3 sample paths drawing in -->
+              <path class="ln-thin" d="M10,52 C24,42 38,62 50,52 C62,42 76,62 90,52 C100,46 108,56 114,50" stroke-dasharray="160" stroke-dashoffset="160">
+                <animate attributeName="stroke-dashoffset" from="160" to="0" dur="1.2s" begin="0.2s;3s;5.8s" fill="freeze" />
+                <animate attributeName="stroke-dashoffset" from="0" to="160" dur="0.0001s" begin="2.999s;5.799s;8.599s" fill="freeze" />
+              </path>
+              <path class="ln-thin" opacity="0.65" d="M10,82 C24,72 38,92 50,80 C62,68 76,90 90,78 C100,72 108,84 114,76" stroke-dasharray="160" stroke-dashoffset="160">
+                <animate attributeName="stroke-dashoffset" from="160" to="0" dur="1.2s" begin="0.5s;3.3s;6.1s" fill="freeze" />
+                <animate attributeName="stroke-dashoffset" from="0" to="160" dur="0.0001s" begin="3.299s;6.099s;8.899s" fill="freeze" />
+              </path>
+              <path class="ln-thin" opacity="0.4" d="M10,112 C24,102 38,124 50,112 C62,100 76,124 90,110 C100,104 108,116 114,108" stroke-dasharray="160" stroke-dashoffset="160">
+                <animate attributeName="stroke-dashoffset" from="160" to="0" dur="1.2s" begin="0.8s;3.6s;6.4s" fill="freeze" />
+                <animate attributeName="stroke-dashoffset" from="0" to="160" dur="0.0001s" begin="3.599s;6.399s;9.199s" fill="freeze" />
+              </path>
+
+              <text class="lbl-sm" x="60" y="138" text-anchor="middle">samples</text>
+            </g>
+
+            <!-- Output variables label -->
+            <text class="lbl-var" x="480" y="278" text-anchor="middle">{ x⁽ⁱ⁾, η⁽ⁱ⁾ }</text>
+          </svg>
+        </div>
+
+        <div class="col col-eqs">
+          <div class="eqs">
+            <div class="eq">
+              \[ \eta_j(t)\sim\mathcal{GP}\!\bigl(0,\;\kappa^{(j)}(t-t')\bigr) \]
+            </div>
+            <div class="eq">
+              \[ z(t)=\begin{bmatrix}x(t)\\ \boldsymbol{\eta}(t)\end{bmatrix},\quad
+                 \dot z = F_c z + B^{\mathrm{a}}_{uc}\,u + w \]
+            </div>
+            <div class="eq">
+              \[ p\!\left(z_{1:N_t}\,\big|\,\hat{\Theta},\theta,\mathcal{D}_{\text{obs}}\right) \]
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================
+         SCENE 3 — MAPPING (BNN)
+         ============================================ -->
+    <div class="scene s3">
+      <div class="scene-header">
+        <div class="stage-tag">Stage&nbsp;<b>II</b> &nbsp;/&nbsp; Mapping</div>
+        <div class="stage-heading">A Bayesian net learns&nbsp;<em>p(η&thinsp;|&thinsp;x)</em></div>
+        <div class="stage-lede">
+          Posterior samples train a BNN that returns a Gaussian over the MFE for any
+          state, with mean and Cholesky-parameterised covariance.
+        </div>
+      </div>
+
+      <div class="scene-body">
+        <div class="col col-diagram">
+          <svg class="diagram" viewBox="0 0 480 320" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrowS3" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" class="fill-ink"></path>
+              </marker>
+
+              <!-- Paths for animated activation pulses — each segment traces an
+                   existing visible connection between two adjacent nodes. -->
+              <path id="bnnP1" d="M60,80  L180,50  L300,110 L400,120" fill="none"></path>
+              <path id="bnnP2" d="M60,160 L180,170 L300,170 L400,120" fill="none"></path>
+              <path id="bnnP3" d="M60,240 L180,230 L300,230 L400,210" fill="none"></path>
+              <path id="bnnP4" d="M60,160 L180,110 L300,110 L400,120" fill="none"></path>
+              <path id="bnnP5" d="M60,240 L180,290 L300,290 L400,210" fill="none"></path>
+              <path id="bnnP6" d="M60,80  L180,170 L300,170 L400,210" fill="none"></path>
+            </defs>
+
+            <!-- Input nodes -->
+            <g>
+              <circle class="ln" cx="60" cy="80"  r="13"></circle>
+              <circle class="ln" cx="60" cy="160" r="13"></circle>
+              <circle class="ln" cx="60" cy="240" r="13"></circle>
+              <text class="lbl-var" x="60" y="86" text-anchor="middle">x₁</text>
+              <text class="lbl-var" x="60" y="166" text-anchor="middle">x₂</text>
+              <text class="lbl-var" x="60" y="246" text-anchor="middle">x₃</text>
+              <text class="lbl-sm" x="60" y="296" text-anchor="middle">STATE</text>
+            </g>
+
+            <!-- Hidden layer 1 -->
+            <g>
+              <circle class="ln-thin bnn-node" cx="180" cy="50"  r="9"></circle>
+              <circle class="ln-thin bnn-node" cx="180" cy="110" r="9"></circle>
+              <circle class="ln-thin bnn-node" cx="180" cy="170" r="9"></circle>
+              <circle class="ln-thin bnn-node" cx="180" cy="230" r="9"></circle>
+              <circle class="ln-thin bnn-node" cx="180" cy="290" r="9"></circle>
+            </g>
+
+            <!-- Hidden layer 2 -->
+            <g>
+              <circle class="ln-thin bnn-node" cx="300" cy="50"  r="9"></circle>
+              <circle class="ln-thin bnn-node" cx="300" cy="110" r="9"></circle>
+              <circle class="ln-thin bnn-node" cx="300" cy="170" r="9"></circle>
+              <circle class="ln-thin bnn-node" cx="300" cy="230" r="9"></circle>
+              <circle class="ln-thin bnn-node" cx="300" cy="290" r="9"></circle>
+            </g>
+
+            <!-- Sparser, lighter connections — only ~half of all edges -->
+            <g stroke="var(--ink)" stroke-width="0.5" opacity="0.18" fill="none">
+              <!-- input -> h1 (skip some) -->
+              <path d="M73,80  L170,50"></path>
+              <path d="M73,80  L170,110"></path>
+              <path d="M73,80  L170,170"></path>
+              <path d="M73,160 L170,50"></path>
+              <path d="M73,160 L170,110"></path>
+              <path d="M73,160 L170,170"></path>
+              <path d="M73,160 L170,230"></path>
+              <path d="M73,160 L170,290"></path>
+              <path d="M73,240 L170,170"></path>
+              <path d="M73,240 L170,230"></path>
+              <path d="M73,240 L170,290"></path>
+              <!-- h1 -> h2 -->
+              <path d="M190,50  L290,50"></path>
+              <path d="M190,50  L290,110"></path>
+              <path d="M190,110 L290,50"></path>
+              <path d="M190,110 L290,110"></path>
+              <path d="M190,110 L290,170"></path>
+              <path d="M190,170 L290,110"></path>
+              <path d="M190,170 L290,170"></path>
+              <path d="M190,170 L290,230"></path>
+              <path d="M190,230 L290,170"></path>
+              <path d="M190,230 L290,230"></path>
+              <path d="M190,230 L290,290"></path>
+              <path d="M190,290 L290,230"></path>
+              <path d="M190,290 L290,290"></path>
+              <!-- h2 -> outputs (μ at 120, L at 210) -->
+              <path d="M310,50  L400,120"></path>
+              <path d="M310,110 L400,120"></path>
+              <path d="M310,170 L400,120"></path>
+              <path d="M310,170 L400,210"></path>
+              <path d="M310,230 L400,210"></path>
+              <path d="M310,290 L400,210"></path>
+            </g>
+
+            <!-- Traveling activation pulses — each rides one full forward path
+                 through the network along ACTUAL connection lines. Three
+                 distinguishable colors so the eye can track individual signals. -->
+            <g>
+              <circle r="3.2" fill="#141414">
+                <animateMotion dur="1.6s" repeatCount="indefinite">
+                  <mpath href="#bnnP1" />
+                </animateMotion>
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" dur="1.6s" repeatCount="indefinite" />
+              </circle>
+              <circle r="3.2" fill="#C97B2A">
+                <animateMotion dur="1.6s" begin="0.4s" repeatCount="indefinite">
+                  <mpath href="#bnnP2" />
+                </animateMotion>
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" dur="1.6s" begin="0.4s" repeatCount="indefinite" />
+              </circle>
+              <circle r="3.2" fill="#2F5A8A">
+                <animateMotion dur="1.6s" begin="0.8s" repeatCount="indefinite">
+                  <mpath href="#bnnP3" />
+                </animateMotion>
+                <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.08;0.92;1" dur="1.6s" begin="0.8s" repeatCount="indefinite" />
+              </circle>
+              <circle r="2.6" fill="#141414" opacity="0.7">
+                <animateMotion dur="1.6s" begin="1.1s" repeatCount="indefinite">
+                  <mpath href="#bnnP4" />
+                </animateMotion>
+                <animate attributeName="opacity" values="0;0.7;0.7;0" keyTimes="0;0.08;0.92;1" dur="1.6s" begin="1.1s" repeatCount="indefinite" />
+              </circle>
+              <circle r="2.6" fill="#C97B2A" opacity="0.7">
+                <animateMotion dur="1.6s" begin="0.2s" repeatCount="indefinite">
+                  <mpath href="#bnnP5" />
+                </animateMotion>
+                <animate attributeName="opacity" values="0;0.7;0.7;0" keyTimes="0;0.08;0.92;1" dur="1.6s" begin="0.2s" repeatCount="indefinite" />
+              </circle>
+              <circle r="2.6" fill="#2F5A8A" opacity="0.7">
+                <animateMotion dur="1.6s" begin="0.6s" repeatCount="indefinite">
+                  <mpath href="#bnnP6" />
+                </animateMotion>
+                <animate attributeName="opacity" values="0;0.7;0.7;0" keyTimes="0;0.08;0.92;1" dur="1.6s" begin="0.6s" repeatCount="indefinite" />
+              </circle>
+            </g>
+
+            <!-- Output branches: μ and L -->
+            <g>
+              <rect class="ln" x="400" y="95"  width="70" height="50" rx="2"></rect>
+              <text class="lbl-var" x="435" y="127" text-anchor="middle">μ(x,θ)</text>
+
+              <rect class="ln" x="400" y="185" width="70" height="50" rx="2"></rect>
+              <text class="lbl-var" x="435" y="217" text-anchor="middle">L(x,θ)</text>
+            </g>
+
+            <!-- Combine arrow to Σ -->
+            <line class="ln-thin" x1="435" y1="145" x2="435" y2="180" marker-end="url(#arrowS3)"></line>
+
+            <!-- Output label -->
+            <text class="lbl-sm" x="435" y="280" text-anchor="middle">Σ = L Lᵀ</text>
+          </svg>
+        </div>
+
+        <div class="col col-eqs">
+          <div class="eqs">
+            <div class="eq">
+              \[ p(\boldsymbol{\eta}\,|\,x,\theta)=\mathcal{N}(\boldsymbol{\mu},\,\boldsymbol{\Sigma}) \]
+            </div>
+            <div class="eq">
+              \[ \boldsymbol{\Sigma}=L\,L^{\!\top} \]
+            </div>
+            <div class="eq">
+              \[ \mathcal{L}_{\mathrm{VI}}=-\mathbb{E}_{q(\theta)}\!\bigl[\log p\bigr]+\mathrm{KL}\bigl[q\,\|\,p\bigr] \]
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================
+         SCENE 4 — PROGNOSIS
+         ============================================ -->
+    <div class="scene s4">
+      <div class="scene-header">
+        <div class="stage-tag">Stage&nbsp;<b>III</b> &nbsp;/&nbsp; Prognosis</div>
+        <div class="stage-heading">Closing the loop <em>without measurements</em></div>
+        <div class="stage-lede">
+          The BNN supplies pseudo-measurements of the MFE; a Kalman filter on the
+          augmented system propagates uncertainty into the predicted states.
+        </div>
+      </div>
+
+      <div class="scene-body">
+        <div class="col col-diagram">
+          <svg class="diagram" viewBox="0 0 540 360" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arrowS4" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" class="fill-ink"></path>
+              </marker>
+
+              <!-- The bent loop-back arrow, traced by the circulating dot.
+                   Identical geometry to the visible arrow above. -->
+              <path id="loopPath"
+                d="M 360 312 C 470 312, 470 105, 360 105"
+                fill="none"></path>
+            </defs>
+
+            <!-- Unseen input + struck-through y_k indicating no measurements -->
+            <g>
+              <text class="lbl-sm" x="270" y="22" text-anchor="middle">UNSEEN&nbsp;INPUT&nbsp;u(t)</text>
+              <line class="ln" x1="270" y1="32" x2="270" y2="70" marker-end="url(#arrowS4)"></line>
+
+              <!-- "no y_k" badge on the left -->
+              <g transform="translate(60,52)">
+                <text class="lbl-var" x="0" y="6" font-size="18">y</text>
+                <text class="lbl-var" x="9" y="11" font-size="11">k</text>
+                <!-- diagonal strike-through -->
+                <line x1="-10" y1="16" x2="22" y2="-8" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round"></line>
+                <text class="lbl-sm" x="-18" y="30">NO REAL</text>
+                <text class="lbl-sm" x="-18" y="44">MEASUREMENT</text>
+              </g>
+            </g>
+
+            <!-- Predict box (top) -->
+            <rect class="ln" x="180" y="75" width="180" height="60" rx="2"></rect>
+            <text class="lbl" x="270" y="100" text-anchor="middle" font-weight="600">Kalman&nbsp;predict</text>
+            <text class="lbl-sm" x="270" y="120" text-anchor="middle">z_{k|k-1} ~ N(m⁻, P⁻)</text>
+
+            <!-- Down arrow to BNN -->
+            <line class="ln march" x1="270" y1="135" x2="270" y2="178" marker-end="url(#arrowS4)"></line>
+
+            <!-- BNN box -->
+            <rect class="ln" x="180" y="180" width="180" height="60" rx="2"></rect>
+            <text class="lbl" x="270" y="205" text-anchor="middle" font-weight="600">BNN  →  pseudo-meas.</text>
+            <text class="lbl-sm" x="270" y="225" text-anchor="middle">η̃_k ~ N(μ̄_η, Σ̄_η)</text>
+
+            <!-- Down arrow to update -->
+            <line class="ln march" x1="270" y1="240" x2="270" y2="283" marker-end="url(#arrowS4)"></line>
+
+            <!-- Update box -->
+            <rect class="ln" x="180" y="285" width="180" height="55" rx="2"></rect>
+            <text class="lbl" x="270" y="310" text-anchor="middle" font-weight="600">Kalman&nbsp;update</text>
+            <text class="lbl-sm" x="270" y="328" text-anchor="middle">m⁺ = m⁻ + K_k(η̃_k − H̃ m⁻)</text>
+
+            <!-- Loop back arrow on the right (marching) -->
+            <path class="ln march-slow" d="M 360 312 C 470 312, 470 105, 360 105" marker-end="url(#arrowS4)"></path>
+            <text class="lbl-sm" x="496" y="212" text-anchor="middle" transform="rotate(90 496 212)">k ← k+1</text>
+
+            <!-- Dot circulating along the bent loop-back arrow -->
+            <circle r="4" class="fill-ink">
+              <animateMotion dur="2.4s" repeatCount="indefinite">
+                <mpath href="#loopPath" />
+              </animateMotion>
+              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" dur="2.4s" repeatCount="indefinite" />
+            </circle>
+
+            <!-- Output-side mini chart: predicted state with growing band -->
+            <g transform="translate(20,180)">
+              <text class="lbl-sm" x="0" y="-8">PREDICTED STATE</text>
+              <line class="ln-mute" x1="0" y1="60" x2="140" y2="60"></line>
+              <line class="ln-mute" x1="0" y1="0" x2="0" y2="120"></line>
+              <!-- envelope -->
+              <path d="
+                M0,55 C20,30 40,80 60,40 C80,5 100,75 120,45 C130,32 140,55 140,55
+                L140,65 C140,75 130,82 120,75
+                C100,55 80,95 60,80 C40,100 20,60 0,75 Z
+              " fill="var(--ink)" fill-opacity="0.10"></path>
+              <!-- mean -->
+              <path class="ln" d="M0,60 C20,38 40,82 60,46 C80,12 100,78 120,52 C130,40 140,60 140,60"></path>
+              <text class="lbl-sm" x="0" y="138">t</text>
+            </g>
+          </svg>
+        </div>
+
+        <div class="col col-eqs">
+          <div class="eqs">
+            <div class="eq">
+              \[ \tilde{\eta}_k\sim\mathcal{N}\!\bigl(\bar{\boldsymbol{\mu}}_\eta(x_{k|k-1}),\,\bar{\boldsymbol{\Sigma}}_\eta(x_{k|k-1})\bigr) \]
+            </div>
+            <div class="eq">
+              \[ K_k=P^{z,-}_k\,\tilde{H}^{\!\top}\!\bigl(\tilde{H}P^{z,-}_k\tilde{H}^{\!\top}+\tilde{R}_k\bigr)^{\!-1} \]
+            </div>
+            <div class="eq">
+              \[ m^{z,+}_k=m^{z,-}_k+K_k\!\bigl(\tilde{\eta}_k-\tilde{H}\,m^{z,-}_k\bigr) \]
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================
+         SCENE 5 — RESULT
+         ============================================ -->
+    <div class="scene s5">
+      <div class="scene-header" style="text-align:center;">
+        <div class="stage-tag" style="text-align:center;">Result</div>
+        <div class="stage-heading" style="text-align:center;">
+          Uncertainty-aware <em>state prediction</em>
+        </div>
+        <div class="stage-lede" style="margin: 1rem auto 0; text-align:center;">
+          End-to-end propagation of diagnostic uncertainty through mapping and prognosis,
+          demonstrated on SDOF, MDOF, Bouc-Wen and the Silverbox benchmark.
+        </div>
+      </div>
+
+      <div class="plot-host" style="flex:1; display:flex; align-items:center; justify-content:center;">
+        <svg class="diagram" viewBox="0 0 800 320" style="max-height: 52vh;" xmlns="http://www.w3.org/2000/svg">
+
+          <defs>
+            <!-- Reveal mask: a rect that grows from x=0 to x=800 during the scene -->
+            <clipPath id="revealClip">
+              <rect x="60" y="0" width="0" height="320">
+                <!-- The reveal lives in real time, repeating every 20s -->
+                <animate attributeName="width"
+                  values="0;0;700;700"
+                  keyTimes="0;0.81;0.97;1"
+                  dur="20s"
+                  repeatCount="indefinite" />
+              </rect>
+            </clipPath>
+
+            <!-- Mean prediction curve — also used by the sweep dot below -->
+            <path id="s5MeanPath" d="
+              M 60,160
+              C 130,120 200,200 270,130
+              C 340,90  410,200 480,130
+              C 550,90  620,200 690,160
+              C 720,170 740,170 760,160
+            " fill="none"></path>
+          </defs>
+
+          <!-- axes -->
+          <line class="ln-mute" x1="60"  y1="280" x2="760" y2="280"></line>
+          <line class="ln-mute" x1="60"  y1="40"  x2="60"  y2="280"></line>
+          <text class="lbl-sm" x="760" y="298" text-anchor="end">time</text>
+          <text class="lbl-sm" x="48"  y="48"  text-anchor="end">response</text>
+
+          <!-- Training window divider — vertical hairline at x=320 -->
+          <line x1="320" y1="40" x2="320" y2="280" stroke="var(--ink)" stroke-width="0.6" stroke-dasharray="2 4" opacity="0.5"></line>
+          <text class="lbl-sm" x="320" y="32" text-anchor="middle">training&nbsp;→&nbsp;prognosis</text>
+
+          <!-- All revealable plot content sits inside the reveal clip -->
+          <g clip-path="url(#revealClip)">
+
+            <!-- ±2σ envelope (light fill, symmetric around the mean) -->
+            <!-- Symmetric construction: mean = M(x), upper = M(x) - 22, lower = M(x) + 22 (svg-y inverted) -->
+            <path d="
+              M 60,138
+              C 130,98  200,178 270,108
+              C 340,68  410,178 480,108
+              C 550,68  620,178 690,138
+              C 720,148 740,148 760,138
+              L 760,182
+              C 740,192 720,192 690,182
+              C 620,222 550,112 480,152
+              C 410,222 340,112 270,152
+              C 200,222 130,142 60,182
+              Z
+            " fill="var(--ink)" fill-opacity="0.10"></path>
+
+            <!-- Upper ±2σ thin -->
+            <path class="ln-thin" opacity="0.45" d="
+              M 60,138
+              C 130,98  200,178 270,108
+              C 340,68  410,178 480,108
+              C 550,68  620,178 690,138
+              C 720,148 740,148 760,138
+            "></path>
+            <!-- Lower ±2σ thin -->
+            <path class="ln-thin" opacity="0.45" d="
+              M 60,182
+              C 130,142 200,222 270,152
+              C 340,112 410,222 480,152
+              C 550,112 620,222 690,182
+              C 720,192 740,192 760,182
+            "></path>
+
+            <!-- Mean prediction (solid) — references the s5MeanPath -->
+            <use href="#s5MeanPath" class="ln"></use>
+
+            <!-- Ground truth (dashed, slight offset from mean) -->
+            <path class="ln-thin" stroke-dasharray="4 5" d="
+              M 60,164
+              C 130,122 200,192 270,134
+              C 340,98  410,192 480,134
+              C 550,94  620,192 690,158
+              C 720,168 740,166 760,162
+            "></path>
+
+          </g>
+
+          <!-- Sweep cursor: vertical hairline + dot tracing the mean curve via mpath -->
+          <g>
+            <line x1="60" y1="40" x2="60" y2="280" stroke="var(--ink)" stroke-width="0.8" opacity="0.55">
+              <animate attributeName="x1" values="60;60;760;760" keyTimes="0;0.81;0.97;1" dur="20s" repeatCount="indefinite" />
+              <animate attributeName="x2" values="60;60;760;760" keyTimes="0;0.81;0.97;1" dur="20s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0;0;0.55;0.55;0" keyTimes="0;0.81;0.83;0.97;1" dur="20s" repeatCount="indefinite" />
+            </line>
+            <circle r="4" class="fill-ink">
+              <!-- Hold at start of path 0–81%, traverse 81–97%, hold at end 97–100% -->
+              <animateMotion dur="20s" repeatCount="indefinite"
+                keyTimes="0;0.81;0.97;1" keyPoints="0;0;1;1">
+                <mpath href="#s5MeanPath" />
+              </animateMotion>
+              <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.81;0.83;0.97;1" dur="20s" repeatCount="indefinite" />
+            </circle>
+          </g>
+
+          <!-- legend -->
+          <g transform="translate(580,52)">
+            <line class="ln" x1="0" y1="0" x2="22" y2="0"></line>
+            <text class="lbl-sm" x="28" y="4">predicted mean</text>
+
+            <line class="ln-thin" stroke-dasharray="4 5" x1="0" y1="20" x2="22" y2="20"></line>
+            <text class="lbl-sm" x="28" y="24">ground truth</text>
+
+            <rect x="0" y="34" width="22" height="10" fill="var(--ink)" fill-opacity="0.18"></rect>
+            <text class="lbl-sm" x="28" y="44">±2σ envelope</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  (function () {
+    // Drive the roman-numeral scene counter from real time, mod 20s.
+    // (CSS content keyframes are unreliable across browsers — do it in JS.)
+    const labels = ["—", "I", "II", "III", "▣"];
+    const el = document.getElementById("roman");
+    let raf;
+    let t0 = null;
+    function tick(ts) {
+      if (t0 === null) t0 = ts;
+      const T = ((ts - t0) / 1000) % 20;
+      let idx;
+      if (T < 4)        idx = 0; // title
+      else if (T < 8)   idx = 1;
+      else if (T < 12)  idx = 2;
+      else if (T < 16)  idx = 3;
+      else              idx = 4;
+      if (el && el.textContent !== labels[idx]) el.textContent = labels[idx];
+      raf = requestAnimationFrame(tick);
+    }
+
+    function start() {
+      try {
+        renderMathInElement(document.body, {
+          delimiters: [
+            { left: "$$", right: "$$", display: true  },
+            { left: "\\[", right: "\\]", display: true  },
+            { left: "$",  right: "$",  display: false },
+            { left: "\\(", right: "\\)", display: false }
+          ],
+          throwOnError: false,
+          strict: false
+        });
+      } catch (e) { /* ignore */ }
+      document.body.classList.add("ready");
+      raf = requestAnimationFrame(tick);
+    }
+
+    if (document.readyState === "complete") {
+      setTimeout(start, 30);
+    } else {
+      window.addEventListener("load", function () { setTimeout(start, 30); });
+    }
+  })();
+</script>
+
+</body>
+</html>
