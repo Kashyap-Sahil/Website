@@ -30,11 +30,11 @@ export const site = {
       href: "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=0MO0ArAAAAAJ&citation_for_view=0MO0ArAAAAAJ:u5HHmVD_uO8C",
     },
     {
-      title: "Paper title — to be added",
+      title: "Probabilistic digital twins for misspecified dynamical systems",
       venue: "Research publication",
       year: "",
       summary:
-        "Placeholder description. A short paragraph introducing this paper's motivation, the question it answers, and the method at a glance. Replace this text with the real abstract when ready — the animated abstract below illustrates the core idea visually.",
+        "Reliable prediction of structural and dynamical systems is limited by missing or simplified physics in their governing equations — and identifying these gaps is only the first step, since the equations themselves must be corrected to enable trustworthy prediction under unseen operating conditions. This work first employs Gaussian-Process Latent Force Models (GPLFMs) to infer latent model-form errors directly from measured responses. Because such errors are generally functions of the system's state, a probabilistic mapping is then constructed between the identified states and the inferred discrepancies, learned using Bayesian Neural Networks. This end-to-end probabilistic framework not only diagnoses where the physics falls short but also corrects it, delivering accurate and uncertainty-aware predictions even when the underlying model is imperfectly known.",
       embed: "/animation-paper-2.html",
       href: "",
     },
