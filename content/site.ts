@@ -30,6 +30,15 @@ export const site = {
       href: "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=0MO0ArAAAAAJ&citation_for_view=0MO0ArAAAAAJ:u5HHmVD_uO8C",
     },
     {
+      title: "Paper title — to be added",
+      venue: "Research publication",
+      year: "",
+      summary:
+        "Placeholder description. A short paragraph introducing this paper's motivation, the question it answers, and the method at a glance. Replace this text with the real abstract when ready — the animated abstract below illustrates the core idea visually.",
+      embed: "/animation-paper-2.html",
+      href: "",
+    },
+    {
       title: "Physics-as-measurement",
       venue: "Research publication",
       year: "",
