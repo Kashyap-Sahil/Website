@@ -7,7 +7,9 @@ export function Contact() {
       <p className="font-serif text-2xl leading-relaxed sm:text-3xl reveal">
         Always open to a thoughtful conversation —{" "}
         <a
-          href={`mailto:${site.email}`}
+          href={site.emailUrl}
+          target="_blank"
+          rel="noreferrer"
           className="border-b border-ink pb-0.5 hover:opacity-60 transition-opacity"
         >
           {site.email}
@@ -19,6 +21,8 @@ export function Contact() {
           <li key={link.label}>
             <a
               href={link.href}
+              target="_blank"
+              rel="noreferrer"
               className="text-muted hover:text-ink transition-colors"
             >
               {link.label}

@@ -10,14 +10,22 @@ export const site = {
     "Through Gaussian processes, Bayesian filtering, and probabilistic digital twins, I develop frameworks that combine imperfect physics with noisy measurements to enable robust state estimation and uncertainty-aware predictions.",
   ],
   email: "sahilkashyap.nr@gmail.com",
+  emailUrl:
+    "https://mail.google.com/mail/?view=cm&fs=1&to=sahilkashyap.nr@gmail.com",
   avatar: "/sahil.jpg",
   links: [
-    { label: "Email", href: "mailto:sahilkashyap.nr@gmail.com" },
+    {
+      label: "Email",
+      href: "https://mail.google.com/mail/?view=cm&fs=1&to=sahilkashyap.nr@gmail.com",
+    },
     {
       label: "Google Scholar",
       href: "https://scholar.google.com/citations?hl=en&user=0MO0ArAAAAAJ",
     },
-    { label: "GitHub", href: "https://github.com/kashyap-sahil" },
+    {
+      label: "CV",
+      href: "https://drive.google.com/file/d/18bzJiYpGT8_wSb7nObqmKZOIa16nCSfo/view?usp=sharing",
+    },
   ],
   papers: [
     {
@@ -36,7 +44,7 @@ export const site = {
       summary:
         "Reliable prediction of structural and dynamical systems is limited by missing or simplified physics in their governing equations — and identifying these gaps is only the first step, since the equations themselves must be corrected to enable trustworthy prediction under unseen operating conditions. This work first employs Gaussian-Process Latent Force Models (GPLFMs) to infer latent model-form errors directly from measured responses. Because such errors are generally functions of the system's state, a probabilistic mapping is then constructed between the identified states and the inferred discrepancies, learned using Bayesian Neural Networks. This end-to-end probabilistic framework not only diagnoses where the physics falls short but also corrects it, delivering accurate and uncertainty-aware predictions even when the underlying model is imperfectly known.",
       embed: "/animation-paper-2.html",
-      href: "",
+      href: "https://scholar.google.com/citations?view_op=view_citation&hl=en&user=0MO0ArAAAAAJ&citation_for_view=0MO0ArAAAAAJ:d1gkVwhDpl0C",
     },
     {
       title: "Physics-as-measurement",

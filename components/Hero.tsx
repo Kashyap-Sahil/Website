@@ -33,7 +33,9 @@ export function Hero() {
             Research
           </a>
           <a
-            href={`mailto:${site.email}`}
+            href={site.emailUrl}
+            target="_blank"
+            rel="noreferrer"
             className="text-muted hover:text-ink transition-colors"
           >
             {site.email}
