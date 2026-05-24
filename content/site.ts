@@ -24,7 +24,7 @@ export const site = {
     },
     {
       label: "CV",
-      href: "https://drive.google.com/file/d/18bzJiYpGT8_wSb7nObqmKZOIa16nCSfo/view?usp=sharing",
+      href: "https://drive.google.com/file/d/19ZA91sj3WAXLTOcwGupn-cwGn37qMvQX/view?usp=sharing",
     },
   ],
   papers: [
