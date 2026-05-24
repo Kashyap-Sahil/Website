@@ -54,7 +54,7 @@ export function HeroAnimation() {
             scrolling="no"
             className="absolute left-1/2 top-0 block border-0 -translate-x-1/2"
             style={{
-              width: "112vw",
+              width: "128vw",
               height: `calc(100% + ${PLAYER_HEIGHT}px)`,
               background: "#f6f3ec",
               opacity: active === i ? 1 : 0,
