@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-const LOOP_MS = 6000;
+const LOOP_MS = 10000;
 const FADE_MS = 700;
 const PLAYER_HEIGHT = 90;
 
